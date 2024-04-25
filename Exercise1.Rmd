@@ -1,0 +1,106 @@
+---
+title: "Exercise 1"
+output: html_document
+date: "2024-04-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Sample Statistics
+
+#### Dataset
+
+Go to UCI Machine learning repository and download the data on the white wine quality. This page contains also the background information on the data. In our analysis we will only consider the following variables:
+
+-   volatile.acidity: Volatile acidity
+
+-   residual.sugar: Residual sugar
+
+-   pH: pH level
+
+-   quality: Wine quality in a score between 0 and 10
+
+#### Exercises
+
+Read the data into R. Add to the data frame a new binary variable good which is 1 if quality \> 5 and 0 otherwise. We would like to compare volatile.acidity and residual.sugar for good and bad wines.
+
+```{r a, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+
+white.wine.quality <- read.csv("winequality-white.csv", sep = ";")
+white.wine.quality <- white.wine.quality %>% select(volatile.acidity, residual.sugar, 
+                              pH, quality)
+
+white.wine.quality <- white.wine.quality %>% 
+  mutate(good = quality > 5)
+
+head(white.wine.quality)
+```
+
+First consider variable residual.sugar.
+
+-   Plot histograms of residual.sugar for good and bad wines using different methods
+    available in R to choose the bin width. Comment on the shape of both histograms and differences in distribution, if any.
+
+    ```{r hist.Sturges}
+
+    good.wine <- white.wine.quality[white.wine.quality$good == 1,]
+    bad.wine <- white.wine.quality[white.wine.quality$good == 0,]
+
+    hist(good.wine$residual.sugar,
+         breaks = "Sturges", 
+         freq=F,
+         main = "Histogram of Residual Sugar of Good Wine",
+         xlab = "Residual Sugar")
+
+    hist(bad.wine$residual.sugar,
+         breaks = "Sturges", 
+         freq=F,
+         main = "Histogram of Residual Sugar of Bad Wine",
+         xlab = "Residual Sugar")
+    ```
+
+    There are 1640 bad wine and 3258 good wine rows. The distribution of good wine seems to have a long tail on the right. The number of bins for good wine is 14 and it is 12 for bad wine when Sturges formula is used.
+
+    ```{r hist.ScottsChoice}
+    hist(good.wine$residual.sugar,
+         breaks = "Scott", 
+         freq=F,
+         main = "Histogram of Residual Sugar of Good Wine",
+         xlab = "Residual Sugar")
+
+    hist(bad.wine$residual.sugar,
+         breaks = "Scott", 
+         freq=F,
+         main = "Histogram of Residual Sugar of Bad Wine",
+         xlab = "Residual Sugar")
+    ```
+
+    When Scott's choice is used, the number of breaks remain the same for the bad wine but it increases significantly for the good wine. We capture more information but it gets noisier.
+
+    ```{r hist.FreedmanDiaconis}
+    hist(good.wine$residual.sugar,
+         breaks = "Freedman-Diaconis", 
+         freq=F,
+         main = "Histogram of Residual Sugar of Good Wine",
+         xlab = "Residual Sugar")
+
+    hist(bad.wine$residual.sugar,
+         breaks = "Freedman-Diaconis", 
+         freq=F,
+         main = "Histogram of Residual Sugar of Bad Wine",
+         xlab = "Residual Sugar")
+    ```
+
+    When FreedmanDiaconis' choice is used, the number of breaks is the same as Scott's choice. Both FreedmanDiaconis' and Scott's choice take the variability into account. However, FreedmanDiaconis' choice utilizes the interquartile range which can make it more robust to outliers.
+
+-   Calculate the summary statistics for both wine groups, that is: mean, median, standard deviation, interquartile range, minimum and maximum of both samples. Display the results in a table and comment on the differences between both groups, if any.
+
+    ```{r summary}
+
+    summary(good.wine)
+    summary(bad.wine)
+    ```
