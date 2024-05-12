@@ -326,8 +326,8 @@ The only difference between QQ and PP plot is that considering ECDFs on the same
 3-) Plot the empirical distribution functions Fn for all three datasets. Add the pointwise confidence bands for α = 0.05 using the central limit theorem and Slutzky’s lemma (ensure that
 the confidence bands are in [0; 1]).
 
-```{r ecdf.confbands}
-ecdf_func <- function(data) { 
+```{r ecdf.pwbands}
+ecdf.func <- function(data) { 
   Length <- length(data) 
   sorted <- sort(data) 
   
@@ -337,17 +337,149 @@ ecdf_func <- function(data) {
   } 
   return(ecdf) 
 } 
+ecdf.pwbands <- function(data, title){
+  Fn <- ecdf(data)
+  ecdf_data <- ecdf.func(data)
+  
+  z <- sqrt(ecdf_data*(1-ecdf_data) / length(ecdf_data))
+  
+  plot(Fn, col="darkgreen", lwd=2, main = title)
+  
+  upper_bound <- Fn(sort(data)) + 1.96 * z
+  lower_bound <- Fn(sort(data)) - 1.96 * z
+  upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
+  lower_bound <- ifelse(lower_bound < 0, 0, lower_bound)
+  
+  lines(sort(data), upper_bound, col="salmon", lwd=2)
+  lines(sort(data), lower_bound, col="salmon", lwd=2)
+}
 
-Fn <- ecdf(good.wine$pH)
-ecdf_data <- ecdf_func(good.wine$pH)
-
-z <- sqrt(ecdf_data*(1-ecdf_data) / length(ecdf_data))
-
-plot(Fn, col="darkgreen", lwd=2)
-
-lines(sort(good.wine$pH), Fn(sort(good.wine$pH))+1.96 * z, col="salmon", lwd=2)
-lines(sort(good.wine$pH), Fn(sort(good.wine$pH))-1.96 * z, col="salmon", lwd=2)
-
+ecdf.pwbands(good.wine$pH, "Good Wine pH ECDF and Pointwise Confidence Intervals")
+ecdf.pwbands(bad.wine$pH, "Bad Wine pH ECDF and Pointwise Confidence Intervals")
+ecdf.pwbands(good.wine$pH, "All Wine pH ECDF and Pointwise Confidence Intervals")
 
 ```
+
+4- Plot the empirical distribution functions Fn for all three datasets together with the uniform
+confidence bands for α = 0.05. Compare to the bands obtained in (3).
+
+```{r ecdf.ksbands}
+ecdf.ksbands <- function(data, title){
+  Fn <- ecdf(data)
+  ecdf_data <- ecdf.func(data)
+
+  plot(Fn, col="darkgreen", lwd=2, main = title)
+  
+  D <- 1.36/ sqrt(length(data))
+  upper_bound <- Fn(sort(data)) + D
+  lower_bound <- Fn(sort(data)) - D
+  upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
+  lower_bound <- ifelse(lower_bound < 0, 0, lower_bound)
+  
+  lines(sort(data), upper_bound, col="salmon", lwd=2)
+  lines(sort(data), lower_bound, col="salmon", lwd=2)
+}
+
+ecdf.ksbands(good.wine$pH, "Good Wine pH ECDF and Uniform Confidence Intervals")
+ecdf.ksbands(bad.wine$pH, "Bad Wine pH ECDF and Uniform Confidence Intervals")
+ecdf.ksbands(good.wine$pH, "All Wine pH ECDF and Uniform Confidence Intervals")
+
+```
+
+Kolmogorov-Smirnov bandwidth for sample size over 35 with 0.05 alpha value is 1.36/sqrt(N) = 0.02382667. The problem with pointwise confidence intervals is, that if we compute them for a lot of points, we accumulate errors. Uniform confidence bands are slightly wider. 
+
+5- Plot the empirical distribution functions of pH for good and bad wines together with the uniform confidence bands in one plot. What can you conclude from this plot?
+
+```{r ecdf.ksbands.good.bad}
+ecdf.ksbands <- function(data, title, col){
+  Fn <- ecdf(data)
+  
+  D <- 1.36 / sqrt(length(data))
+  upper_bound <- Fn(sort(data)) + D
+  lower_bound <- Fn(sort(data)) - D
+  upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
+  lower_bound <- ifelse(lower_bound < 0, 0, lower_bound)
+  
+  lines(sort(data), upper_bound, col=col, lwd=2, lty = "dashed")
+  lines(sort(data), lower_bound, col=col, lwd=2, lty = "dashed")
+}
+
+# Create an empty plot with x-axis limits covering the range of both datasets
+plot(ecdf(good.wine$pH), col="darkgreen", lwd=2, main = "Wine pH ECDF and Uniform Confidence Intervals", xlim = range(c(good.wine$pH, bad.wine$pH)))
+
+# Plot ECDFs for both good and bad wine pH
+lines(ecdf(bad.wine$pH), col="darkred", lwd=2)
+
+# Plot confidence intervals for both good and bad wine pH
+ecdf.ksbands(good.wine$pH, "Good Wine pH", col="blue")
+ecdf.ksbands(bad.wine$pH, "Bad Wine pH", col="orange")
+
+# Add a legend
+legend("bottomright", legend=c("Good Wine (ECDF)", "Bad Wine (ECDF)", "Good Wine (Confidence Intervals)", "Bad Wine (Confidence Intervals)"), 
+       col=c("darkgreen", "darkred", "blue", "orange"), lwd=2, cex=0.8, lty=c("solid", "solid", "dashed", "dashed"))
+
+```
+
+On the ECDF we can see that up to a certain point, about to the pH value 3.1, good and bad wine pHs follow a similar distribution. Afterwards the gap increases as there are less bad wines with higher pH values. Additionally, bad wines seem to have a larger confidence bands on tails compared to good wines.
+
+## Maximum likelihood estimation
+Let X be Laplace distributed with parameters (µ, σ)
+t ∈ R × (0, ∞), i.e., X has density
+
+\[ f(x | \mu, σ) = \frac{1}{2σ} \exp\left(-\frac{|x - \mu|}{σ}\right) \]
+
+#### Exercises
+1- Consider a sample of independent observations (X1, . . . , Xn). Show that the maximum likelihood estimator for µ is the median of the sample. Is it unique?
+
+Consider the likelihood function for N data samples:
+\[L(\mu,\sigma;x) = \prod_{t=1}^{N} \frac{1}{\sqrt{2}\sigma} e^{-\frac{\sqrt{2}|x_t-\mu|}{\sigma}} = (\sqrt{2}\sigma)^{-N} e^{-\frac{\sqrt{2}}{\sigma}\sum_{t=1}^{N}|x_t-\mu|}\]
+
+Take the log likelihood function:
+
+\[l(\mu,\sigma;x) = -N \ln(\sqrt{2}\sigma) - \frac{\sqrt{2}}{\sigma} \sum_{t=1}^{N}|x_t-\mu|\]
+
+
+Take the derivative with respect to the parameter μ:
+\[\frac{\partial l}{\partial \mu} = -\frac{\sqrt{2}}{\sigma} \sum_{t=1}^{N} \frac{\partial |x_t-\mu|}{\partial \mu}\]
+
+which is equal to:
+= \[\frac{\sqrt{2}}{\sigma} \sum_{t=1}^{N} \text{sgn}(x_t-\mu) = 0 \quad (1)\]
+
+The only unique solution to the equation is the median.
+
+
+2- Generate n = 20 independent realisations of X with µ = 1 and σ = 1. Determine the maximum likelihood estimator of µ based on this sample using R function quantile. Function quantile has 9 types of sample quantiles. Experiment with the different types of quantiles that are most suitable for the data (justify). Are there any differences? Increase now the sample to n = 1000 and compare different median estimators. Comment on the result.
+
+```{r}
+# install.packages('jmuOutlier')
+library(jmuOutlier)
+
+
+
+set.seed(123)
+
+# Set parameters
+mu <- 1
+sigma <- 1
+
+# Generate 20 independent realizations
+n <- 20
+laplace_data <- rlaplace(n, mu, sigma)
+
+for (i in 1:9) {
+  cat("20 Samples Type ", i, " Median: ", quantile(laplace_data, 0.5, type = i), "\n")
+}
+
+
+n <- 1000
+laplace_data <- rlaplace(n, mu, sigma)
+
+for (i in 1:9) {
+  cat("1000 Samples Type ", i, " Median: ", quantile(laplace_data, 0.5, type = i), "\n")
+}
+
+```
+
+To generate 20 independent realizations of a Laplace distribution with parameters µ = 1 and σ = 1 in R, you can use the rlaplace() function from the jmuOutlier package. They result in the same pattern. Type 1,3 and 4 are the same and the rest are another value. The reason for this is that for types 5 through 9, a different version of linear interpolation is applied. Type 4 is the linear interpolation of the empirical cdf. Type 2 averages at discontinuities and since we have even sample sizes and we are interested in the median, they all result in the same value. Therefore, type 1,3 and 4 rounds down and the rest takes the average of the 10th and 11th or the 500th and the 501st. In our case, type 2,5,6,7,8 and 9 can be used for an unbiased estimator.
+When comparing the results for n = 20 and n = 1000, you'll notice that the medians are very close. This is expected because as the sample size increases, the sample median tends to converge to the population median, resulting in more consistent estimates regardless of the quantile type used.
 
