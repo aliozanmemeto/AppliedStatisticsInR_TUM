@@ -24,7 +24,7 @@ Go to UCI Machine learning repository and download the data on the white wine qu
 
 #### Exercises
 
-Read the data into R. Add to the data frame a new binary variable good which is 1 if quality \> 5 and 0 otherwise. We would like to compare volatile.acidity and residual.sugar for good and bad wines.
+1. Read the data into R. Add to the data frame a new binary variable good which is 1 if quality \> 5 and 0 otherwise. We would like to compare volatile.acidity and residual.sugar for good and bad wines.
 
 ```{r a, warning=FALSE, message=FALSE}
 library(tidyverse)
@@ -40,67 +40,314 @@ white.wine.quality <- white.wine.quality %>%
 head(white.wine.quality)
 ```
 
-First consider variable residual.sugar.
+2. First consider variable residual.sugar.
 
--   Plot histograms of residual.sugar for good and bad wines using different methods
-    available in R to choose the bin width. Comment on the shape of both histograms and differences in distribution, if any.
++ Plot histograms of residual.sugar for good and bad wines using different methods available in R to choose the bin width. Comment on the shape of both histograms and differences in distribution, if any.
 
-    ```{r hist.Sturges}
+```{r hist.Sturges}
 
-    good.wine <- white.wine.quality[white.wine.quality$good == 1,]
-    bad.wine <- white.wine.quality[white.wine.quality$good == 0,]
+good.wine <- white.wine.quality[white.wine.quality$good == 1,]
+bad.wine <- white.wine.quality[white.wine.quality$good == 0,]
 
-    hist(good.wine$residual.sugar,
-         breaks = "Sturges", 
-         freq=F,
-         main = "Histogram of Residual Sugar of Good Wine",
-         xlab = "Residual Sugar")
+hist(good.wine$residual.sugar,
+ breaks = "Sturges", 
+ freq=F,
+ main = "Histogram of Residual Sugar of Good Wine with Sturges' Rule",
+ xlab = "Residual Sugar")
 
-    hist(bad.wine$residual.sugar,
-         breaks = "Sturges", 
-         freq=F,
-         main = "Histogram of Residual Sugar of Bad Wine",
-         xlab = "Residual Sugar")
-    ```
+hist(bad.wine$residual.sugar,
+ breaks = "Sturges", 
+ freq=F,
+ main = "Histogram of Residual Sugar of Bad Wine with Sturges' Rule",
+ xlab = "Residual Sugar")
+```
 
-    There are 1640 bad wine and 3258 good wine rows. The distribution of good wine seems to have a long tail on the right. The number of bins for good wine is 14 and it is 12 for bad wine when Sturges formula is used.
+There are 1640 bad wine and 3258 good wine rows. The distribution of good wine seems to have a long tail on the right. The number of bins for good wine is 14 and it is 12 for bad wine when Sturges formula is used.
 
-    ```{r hist.ScottsChoice}
-    hist(good.wine$residual.sugar,
-         breaks = "Scott", 
-         freq=F,
-         main = "Histogram of Residual Sugar of Good Wine",
-         xlab = "Residual Sugar")
+```{r hist.ScottsChoice}
+hist(good.wine$residual.sugar,
+     breaks = "Scott", 
+     freq=F,
+     main = "Histogram of Residual Sugar of Good Wine with Scott's Rule",
+     xlab = "Residual Sugar")
 
-    hist(bad.wine$residual.sugar,
-         breaks = "Scott", 
-         freq=F,
-         main = "Histogram of Residual Sugar of Bad Wine",
-         xlab = "Residual Sugar")
-    ```
+hist(bad.wine$residual.sugar,
+     breaks = "Scott", 
+     freq=F,
+     main = "Histogram of Residual Sugar of Bad Wine with Scott's Rule",
+     xlab = "Residual Sugar")
+```
 
-    When Scott's choice is used, the number of breaks remain the same for the bad wine but it increases significantly for the good wine. We capture more information but it gets noisier.
+When Scott's choice is used, the number of breaks remains the same for the bad wine, but it increases significantly for the good wine. This allows us to capture more information, but it also introduces more noise.
 
-    ```{r hist.FreedmanDiaconis}
-    hist(good.wine$residual.sugar,
-         breaks = "Freedman-Diaconis", 
-         freq=F,
-         main = "Histogram of Residual Sugar of Good Wine",
-         xlab = "Residual Sugar")
+```{r hist.FreedmanDiaconis}
+hist(good.wine$residual.sugar,
+     breaks = "Freedman-Diaconis", 
+     freq=F,
+     main = "Histogram of Residual Sugar of Good Wine with Freedman-Diaconis Rule",
+     xlab = "Residual Sugar")
 
-    hist(bad.wine$residual.sugar,
-         breaks = "Freedman-Diaconis", 
-         freq=F,
-         main = "Histogram of Residual Sugar of Bad Wine",
-         xlab = "Residual Sugar")
-    ```
+hist(bad.wine$residual.sugar,
+     breaks = "Freedman-Diaconis", 
+     freq=F,
+     main = "Histogram of Residual Sugar of Bad Wine with Freedman-Diaconis Rule",
+     xlab = "Residual Sugar")
+```
 
-    When FreedmanDiaconis' choice is used, the number of breaks is the same as Scott's choice. Both FreedmanDiaconis' and Scott's choice take the variability into account. However, FreedmanDiaconis' choice utilizes the interquartile range which can make it more robust to outliers.
+When Freedman-Diaconis' choice is used, the number of breaks is the same as with Scott's choice. Both Freedman-Diaconis' and Scott's choices take variability into account. However, Freedman-Diaconis' choice utilizes the interquartile range, which can make it more robust to outliers.
 
--   Calculate the summary statistics for both wine groups, that is: mean, median, standard deviation, interquartile range, minimum and maximum of both samples. Display the results in a table and comment on the differences between both groups, if any.
++   Calculate the summary statistics for both wine groups, that is: mean, median, standard deviation, interquartile range, minimum and maximum of both samples. Display the results in a table and comment on the differences between both groups, if any.
 
-    ```{r summary}
 
-    summary(good.wine)
-    summary(bad.wine)
-    ```
+```{r summary}
+white.wine.quality %>%
+  group_by(good) %>%
+  summarise(mean.rs = mean(residual.sugar),
+                        median.rs = median(residual.sugar),
+                        sd.rs = sd(residual.sugar),
+                        IQR.rs = IQR(residual.sugar),
+                        min.rs = min(residual.sugar),
+                        max.rs = max(residual.sugar))
+
+```
+Considering that both of these variables from the good and bad groups are bounded by 0, the maximum values of residual sugar in good wine seem to be very high, possibly indicating an outlier or a high tail on the right side. Despite this high value, the interquartile range (IQR) of good wine is lower than that of bad wine, supporting the fact that the IQR is a variability measure highly robust to outliers.
+
+Despite the presence of the outlier, we can observe that the mean residual sugar of bad wine is higher than that of good wine. The median also appears to be considerably higher. However, the question arises whether these differences are statistically significant.
+
++   Generate boxplots for both samples, placing them into one graphic. What do you observe?
+```{r boxplot}
+
+p <- ggplot(white.wine.quality, aes(good, residual.sugar))
+p + geom_boxplot()
+
+```
+
+We can support the pattern we encountered in the previous question. It is highly likely that the value 65.8 is an outlier. There are a couple more values above the upper whisker. The median of the bad wine group is slightly higher than that of the good wine group. 
+
++   Generate a QQ-plot to compare two groups. Make sure to choose the same range for both axes. Add a y = x line to the plots. Comment on the results.
+
+```{r qqplot}
+
+range_values <- range(c(good.wine$residual.sugar, bad.wine$residual.sugar))
+
+# Generate QQ-plot for good quality wine with same axis range
+#ggplot(data = good.wine, aes(sample = residual.sugar)) +
+#  geom_qq() +
+#  geom_abline(slope = 1, intercept = 0, color = "red") +
+#  xlim(range_values) + ylim(range_values) +
+#  labs(title = "QQ-Plot for Residual Sugar in Good Quality White Wine")
+  
+# Generate QQ-plot for bad quality wine with same axis range
+#ggplot(data = bad.wine, aes(sample = residual.sugar)) +
+#  geom_qq() +
+#  geom_abline(slope = 1, intercept = 0, color = "red") +
+#  xlim(range_values) + ylim(range_values) +
+#  labs(title = "QQ-Plot for Residual Sugar in Bad Quality White Wine")
+bad.wine.sorted <- sort(bad.wine$residual.sugar)
+good.wine.sorted.bwquantiles <- sort(quantile(good.wine$residual.sugar,
+                           probs=ppoints(bad.wine$residual.sugar)))
+
+range_values <- range(c(bad.wine.sorted, good.wine.sorted.bwquantiles))
+plot(bad.wine.sorted,good.wine.sorted.bwquantiles,
+     xlim = range_values, ylim = range_values, abline(0,1))
+
+```
+
+We can observe that the residual sugar distribution of good wine is more right-skewed than that of bad wine. Additionally, we can identify those extreme values in the distribution of good wines.
+
++   Plot the empirical distribution functions of both groups in one graphic. Use different
+styles and add a legend. Interpret the results.
+
+```{r ecdf}
+plot(ecdf(good.wine$residual.sugar), verticals=TRUE, do.points=FALSE, main = "ECDFs of Residual Sugar")
+plot(ecdf(bad.wine$residual.sugar), verticals=TRUE, do.points=FALSE, add=TRUE, col='brown'
+     , lty=2)
+legend("bottomright", legend = c("Good Quality", "Bad Quality"),
+       col = c("black", "brown"), lty = c(1, 2))
+```
+
+While the brown plot represents the ECDF of residual sugar for bad wine, the black one represents that of good wine. From the ECDF, we can identify where the most values occur. It's evident that there are more values for good wine than for bad wine. However, up to a certain point, the number of good and bad wines is similar. Therefore, for lower values of residual sugar, we can say they distribute similarly.
+
+3.  Consider now volatile.acidity for good and bad wines. Use boxplots, histograms, QQplots, summary statistics and empirical distribution functions to compare this variable for
+good and bad wines. Comment on the results.
+
+```{r volatile.acidity}
+p <- ggplot(white.wine.quality, aes(good, volatile.acidity))
+p + geom_boxplot()
+
+hist(good.wine$volatile.acidity,
+ breaks = "Sturges", 
+ freq=F,
+ main = "Histogram of Volatile Acidity of Good Wine with Sturges' Rule",
+ xlab = "Volatile Acidity")
+
+hist(bad.wine$volatile.acidity,
+ breaks = "Sturges", 
+ freq=F,
+ main = "Histogram of Volatile Acidity of Bad Wine with Sturges' Rule",
+ xlab = "Volatile Acidity")
+
+
+hist(good.wine$volatile.acidity,
+     breaks = "Scott", 
+     freq=F,
+     main = "Histogram of Volatile Acidity of Good Wine with Scott's Rule",
+     xlab = "Volatile Acidity")
+
+hist(bad.wine$volatile.acidity,
+     breaks = "Scott", 
+     freq=F,
+     main = "Histogram of Volatile Acidity of Bad Wine with Scott's Rule",
+     xlab = "Volatile Acidity")
+
+
+hist(good.wine$volatile.acidity,
+     breaks = "Freedman-Diaconis", 
+     freq=F,
+     main = "Histogram of Volatile Acidity of Good Wine with Freedman-Diaconis Rule",
+     xlab = "Volatile Acidity")
+
+hist(bad.wine$volatile.acidity,
+     breaks = "Freedman-Diaconis", 
+     freq=F,
+     main = "Histogram of Volatile Acidity of Bad Wine with Freedman-Diaconis Rule",
+     xlab = "Volatile Acidity")
+
+
+bad.wine.sorted <- sort(bad.wine$volatile.acidity)
+good.wine.sorted.bwquantiles <- sort(quantile(good.wine$volatile.acidity,
+                           probs=ppoints(bad.wine$volatile.acidity)))
+
+range_values <- range(c(bad.wine.sorted, good.wine.sorted.bwquantiles))
+
+plot(bad.wine.sorted,good.wine.sorted.bwquantiles,
+     xlim = range_values, ylim = range_values, abline(0,1))
+
+white.wine.quality %>%
+  group_by(good) %>%
+  summarise(mean.va = mean(volatile.acidity),
+                        median.va = median(volatile.acidity),
+                        sd.va = sd(volatile.acidity),
+                        IQR.va = IQR(volatile.acidity),
+                        min.va = min(volatile.acidity),
+                        max.va = max(volatile.acidity))
+
+plot(ecdf(good.wine$volatile.acidity), verticals=TRUE, do.points=FALSE, main = "ECDFs of Volatile Acidity")
+plot(ecdf(bad.wine$volatile.acidity), verticals=TRUE, do.points=FALSE, add=TRUE, col='brown'
+     , lty=2)
+legend("bottomright", legend = c("Good Quality", "Bad Quality"),
+       col = c("black", "brown"), lty = c(1, 2))
+
+```
+
+Boxplots of both wine groups seem to have a very heavy and long right tail. The median of the bad wine group is slightly higher than that of the good wine group.
+
+When we look at histograms, transitioning from Sturges' Rule to Scott's Rule, the number of bins increases for both good and bad wines. The reason why it did not differ in residual sugar might be that the variance in volatile acidity is much lower than the variance in residual sugar. Additionally, the IQR of volatile acidity is significantly lower than that of residual sugar in both wines. Eventually, the bin width of Freedman-Diaconis is very small in bad wines as well.
+
+Looking at the QQ plot, we can see that the values of good wine are more concentrated or have less variance than those for bad wines because of the slope of the QQ plot. Additionally since values are below the y=x line, the good wine group is expected to have lower mean.
+
+On the ECDF plot, we can see that there are more values for good wine than for bad wine. This is also consistent with the fact that there were more bad wine values below the good wine values on the QQ plot.
+
+## Examine the distribution of data
+
+#### Dataset
+
+Consider the dataset from the previous exercise and its variable pH.
+
+#### Exercises
+
+1- Plot a histogram of pH for all wines and add to the plot a normal density, estimating the parameters from the data. Produce same histograms with corresponding normal densities for good and bad wines separately. Do you observe any differences in the distributions?
+
+```{r hist.FreedmanDiaconis.pH}
+
+hist(good.wine$pH,
+     freq = FALSE,
+     main = "Histogram of pH for Good Wine with Normal Density Estimation",
+     xlab = "pH")
+curve(dnorm(x, mean = mean(good.wine$pH), sd = sd(good.wine$pH)), 
+      add = TRUE, 
+      col = "blue", 
+      lwd = 2)
+
+hist(bad.wine$pH,
+     freq = FALSE,
+     main = "Histogram of pH for Bad Wine with Normal Density Estimation",
+     xlab = "pH")
+curve(dnorm(x, mean = mean(bad.wine$pH), sd = sd(bad.wine$pH)), 
+      add = TRUE, 
+      col = "blue", 
+      lwd = 2)
+
+```
+
+Distributions seem more or less normal and similar. The pH of bad wine is slightly spykier than that of the pH of good wine. 
+
+2- Generate QQ-plots of pH for good, bad and all wines to compare empirical quantiles of the samples to the theoretical quantiles of a normal distribution. Produce PP-plots for all three datasets. Comment on the differences between QQ-plots and PP-plots. Do you think all samples follow a normal distribution?
+
+```{r qqplot.theoretical}
+qqnorm(good.wine$pH, main="QQ-plot of pH for Good Wine")
+qqline(good.wine$pH)
+
+qqnorm(bad.wine$pH, main="QQ-plot of pH for Bad Wine")
+qqline(bad.wine$pH)
+
+qqnorm(white.wine.quality$pH, main="QQ-plot of pH for All Wines")
+qqline(white.wine.quality$pH)
+
+```
+
+Good wine and all wine datasets seem to have a lighter left tail and heavier right tail than the theoretical normal distribution. Bad wine seems to only have lighter right tail but left tail seems to be more or less similar to the normal distribution.
+
+```{r ppplot.theoretical}
+
+standardized.data <- (good.wine$pH - mean(good.wine$pH)) / sd(good.wine$pH)
+probDist <- pnorm(standardized.data)
+plot(ppoints(length(standardized.data)), sort(probDist),
+     main="QQ-plot of pH for Good Wine")
+abline(0,1)
+
+standardized.data <- (bad.wine$pH - mean(bad.wine$pH)) / sd(bad.wine$pH)
+probDist <- pnorm(standardized.data)
+plot(ppoints(length(standardized.data)), sort(probDist),
+     main="QQ-plot of pH for Bad Wine")
+abline(0,1)
+
+standardized.data <- (white.wine.quality$pH - mean(white.wine.quality$pH)) / sd(white.wine.quality$pH)
+probDist <- pnorm(standardized.data)
+plot(ppoints(length(standardized.data)), sort(probDist),
+     main="QQ-plot of pH for All Wine")
+abline(0,1)
+
+```
+
+The only difference between QQ and PP plot is that considering ECDFs on the same plot, whilst QQ-plot plots the corresponding values horizontally, PP-plot plots the vertical values. Therefore it makes more sense that tails are better expressed on qq-plot and mode is better expressed with pp-plot. Differences on tails are more clear on QQ-plots. But they more or less follow normal distributions.
+
+
+3-) Plot the empirical distribution functions Fn for all three datasets. Add the pointwise confidence bands for α = 0.05 using the central limit theorem and Slutzky’s lemma (ensure that
+the confidence bands are in [0; 1]).
+
+```{r ecdf.confbands}
+ecdf_func <- function(data) { 
+  Length <- length(data) 
+  sorted <- sort(data) 
+  
+  ecdf <- rep(0, Length) 
+  for (i in 1:Length) { 
+    ecdf[i] <- sum(sorted <= data[i]) / Length 
+  } 
+  return(ecdf) 
+} 
+
+Fn <- ecdf(good.wine$pH)
+ecdf_data <- ecdf_func(good.wine$pH)
+
+z <- sqrt(ecdf_data*(1-ecdf_data) / length(ecdf_data))
+
+plot(Fn, col="darkgreen", lwd=2)
+
+lines(sort(good.wine$pH), Fn(sort(good.wine$pH))+1.96 * z, col="salmon", lwd=2)
+lines(sort(good.wine$pH), Fn(sort(good.wine$pH))-1.96 * z, col="salmon", lwd=2)
+
+
+```
+
