@@ -302,19 +302,19 @@ Good wine and all wine datasets seem to have a lighter left tail and heavier rig
 
 standardized.data <- (good.wine$pH - mean(good.wine$pH)) / sd(good.wine$pH)
 probDist <- pnorm(standardized.data)
-plot(ppoints(length(standardized.data)), sort(probDist),
+plot(sort(probDist), ppoints(length(standardized.data)), 
      main="QQ-plot of pH for Good Wine")
 abline(0,1)
 
 standardized.data <- (bad.wine$pH - mean(bad.wine$pH)) / sd(bad.wine$pH)
 probDist <- pnorm(standardized.data)
-plot(ppoints(length(standardized.data)), sort(probDist),
+plot(sort(probDist), ppoints(length(standardized.data)), 
      main="QQ-plot of pH for Bad Wine")
 abline(0,1)
 
 standardized.data <- (white.wine.quality$pH - mean(white.wine.quality$pH)) / sd(white.wine.quality$pH)
 probDist <- pnorm(standardized.data)
-plot(ppoints(length(standardized.data)), sort(probDist),
+plot(sort(probDist), ppoints(length(standardized.data)), 
      main="QQ-plot of pH for All Wine")
 abline(0,1)
 
@@ -336,7 +336,7 @@ ecdf.func <- function(data) {
     ecdf[i] <- sum(sorted <= data[i]) / Length 
   } 
   return(ecdf) 
-} 
+}
 ecdf.pwbands <- function(data, title){
   Fn <- ecdf(data)
   ecdf_data <- ecdf.func(data)
@@ -370,7 +370,7 @@ ecdf.ksbands <- function(data, title){
 
   plot(Fn, col="darkgreen", lwd=2, main = title)
   
-  D <- 1.36/ sqrt(length(data))
+  D <- 1.3581/ sqrt(length(data))
   upper_bound <- Fn(sort(data)) + D
   lower_bound <- Fn(sort(data)) - D
   upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
@@ -386,7 +386,7 @@ ecdf.ksbands(good.wine$pH, "All Wine pH ECDF and Uniform Confidence Intervals")
 
 ```
 
-Kolmogorov-Smirnov bandwidth for sample size over 35 with 0.05 alpha value is 1.36/sqrt(N) = 0.02382667. The problem with pointwise confidence intervals is, that if we compute them for a lot of points, we accumulate errors. Uniform confidence bands are slightly wider. 
+Kolmogorov-Smirnov bandwidth for sample size over 35 with 0.05 alpha value is [1.36/sqrt(N)](https://real-statistics.com/statistics-tables/kolmogorov-smirnov-table/) = 0.02382667. The problem with pointwise confidence intervals is, that if we compute them for a lot of points, we accumulate errors. Uniform confidence bands are slightly wider. 
 
 5- Plot the empirical distribution functions of pH for good and bad wines together with the uniform confidence bands in one plot. What can you conclude from this plot?
 
@@ -394,7 +394,7 @@ Kolmogorov-Smirnov bandwidth for sample size over 35 with 0.05 alpha value is 1.
 ecdf.ksbands <- function(data, title, col){
   Fn <- ecdf(data)
   
-  D <- 1.36 / sqrt(length(data))
+  D <- 1.3581/ sqrt(length(data))
   upper_bound <- Fn(sort(data)) + D
   lower_bound <- Fn(sort(data)) - D
   upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
@@ -432,30 +432,40 @@ t ∈ R × (0, ∞), i.e., X has density
 1- Consider a sample of independent observations (X1, . . . , Xn). Show that the maximum likelihood estimator for µ is the median of the sample. Is it unique?
 
 Consider the likelihood function for N data samples:
-\[L(\mu,\sigma;x) = \prod_{t=1}^{N} \frac{1}{\sqrt{2}\sigma} e^{-\frac{\sqrt{2}|x_t-\mu|}{\sigma}} = (\sqrt{2}\sigma)^{-N} e^{-\frac{\sqrt{2}}{\sigma}\sum_{t=1}^{N}|x_t-\mu|}\]
+\[L(\mu,\sigma;x) = \prod_{t=1}^{N} \frac{1}{2\sigma} e^{-\frac{|x_t-\mu|}{\sigma}} = (2\sigma)^{-N} e^{-\frac{1}{\sigma}\sum_{t=1}^{N}|x_t-\mu|}\]
 
 Take the log likelihood function:
 
-\[l(\mu,\sigma;x) = -N \ln(\sqrt{2}\sigma) - \frac{\sqrt{2}}{\sigma} \sum_{t=1}^{N}|x_t-\mu|\]
+\[l(\mu,\sigma;x) = -N \ln(2\sigma) - \frac{{1}}{\sigma} \sum_{t=1}^{N}|x_t-\mu|\]
 
 
-Take the derivative with respect to the parameter μ:
-\[\frac{\partial l}{\partial \mu} = -\frac{\sqrt{2}}{\sigma} \sum_{t=1}^{N} \frac{\partial |x_t-\mu|}{\partial \mu}\]
+Take the derivative with respect to the parameter $\mu$:
+\[ 
+\frac{\partial l}{\partial \mu} = -\frac{1}{\sigma} \sum_{t=1}^{N} \frac{\partial |x_t-\mu|}{\partial \mu}
+\]
 
 which is equal to:
-= \[\frac{\sqrt{2}}{\sigma} \sum_{t=1}^{N} \text{sgn}(x_t-\mu) = 0 \quad (1)\]
+\[
+\frac{1}{\sigma} \sum_{t=1}^{N} \text{sgn}(x_t-\mu) = 0 \quad (1)
+\]
 
-The only unique solution to the equation is the median.
+The sign function, usually denoted as $\text{sgn}(x)$, returns:
+\[
+\text{sgn}(x) = 
+\begin{cases} 
+1 & \text{if } x > 0 \\
+0 & \text{if } x = 0 \\
+-1 & \text{if } x < 0 
+\end{cases}
+\]
 
+The median is a solution for both cases when N is an odd or even number. However, it is not unique for the even case. If N is even, {\mu} can take values strictly between $> x_{\left(\frac{n}{2}\right)}$ and $< x_{\left(\frac{n}{2}+1\right)}$. If it is odd it is unique and is equal to the median.
 
 2- Generate n = 20 independent realisations of X with µ = 1 and σ = 1. Determine the maximum likelihood estimator of µ based on this sample using R function quantile. Function quantile has 9 types of sample quantiles. Experiment with the different types of quantiles that are most suitable for the data (justify). Are there any differences? Increase now the sample to n = 1000 and compare different median estimators. Comment on the result.
 
-```{r}
+```{r laplace.quantile}
 # install.packages('jmuOutlier')
 library(jmuOutlier)
-
-
-
 set.seed(123)
 
 # Set parameters
@@ -464,22 +474,101 @@ sigma <- 1
 
 # Generate 20 independent realizations
 n <- 20
-laplace_data <- rlaplace(n, mu, sigma)
+laplace.data.20 <- rlaplace(n, mu, sigma)
 
 for (i in 1:9) {
-  cat("20 Samples Type ", i, " Median: ", quantile(laplace_data, 0.5, type = i), "\n")
+  cat("20 Samples Type ", i, " Median: ", quantile(laplace.data.20, 0.5, type = i), "\n")
 }
 
 
 n <- 1000
-laplace_data <- rlaplace(n, mu, sigma)
+laplace.data.1000 <- rlaplace(n, mu, sigma)
 
 for (i in 1:9) {
-  cat("1000 Samples Type ", i, " Median: ", quantile(laplace_data, 0.5, type = i), "\n")
+  cat("1000 Samples Type ", i, " Median: ", quantile(laplace.data.1000, 0.5, type = i), "\n")
 }
 
 ```
 
 To generate 20 independent realizations of a Laplace distribution with parameters µ = 1 and σ = 1 in R, you can use the rlaplace() function from the jmuOutlier package. They result in the same pattern. Type 1,3 and 4 are the same and the rest are another value. The reason for this is that for types 5 through 9, a different version of linear interpolation is applied. Type 4 is the linear interpolation of the empirical cdf. Type 2 averages at discontinuities and since we have even sample sizes and we are interested in the median, they all result in the same value. Therefore, type 1,3 and 4 rounds down and the rest takes the average of the 10th and 11th or the 500th and the 501st. In our case, type 2,5,6,7,8 and 9 can be used for an unbiased estimator.
 When comparing the results for n = 20 and n = 1000, you'll notice that the medians are very close. This is expected because as the sample size increases, the sample median tends to converge to the population median, resulting in more consistent estimates regardless of the quantile type used.
+
+3- Write your own function that calculates the maximum likelihood estimator for a Laplace sample numerically using R function optimise. Describe how R function optimise finds
+the maximum. Can you employ a Newton-Raphson algorithm for this problem? Generate n = 20 and n = 1000 independent realisations of X with µ = 1 and σ = 1. Calculate the maximum likelihood estimators based on both samples with your function and using quantile. Compare both estimators, comment on the results.
+
+```{r laplace}
+
+laplace_data <- laplace.data.1000
+  laplace.log.likelihood <- function(mu) {
+    (-length(laplace_data)*log(sqrt(2) *sigma) -(sqrt(2)/sigma) * sum(abs(laplace_data - mu)))
+  }
+
+optimise(laplace.log.likelihood,maximum = T,
+         lower = 0, upper = 10)
+
+laplace_data <- laplace.data.20
+optimise(laplace.log.likelihood,maximum = T,
+         lower = 0, upper = 10)
+
+
+
+laplace_data <- laplace.data.1000
+
+# Newton-Raphson
+niter <- 100
+# xk Initial values
+laplace.log.likelihood.newton <- function(xk){
+  h <- 0.01
+  for(k in 1:niter){
+    Q <- (h/2) * ((laplace.log.likelihood(xk + h) - laplace.log.likelihood(xk - h))/
+                    (laplace.log.likelihood(xk + h) - 2*laplace.log.likelihood(xk) + laplace.log.likelihood(xk - h)))
+    xnew <- xk - Q
+    print(xnew)
+    xk <- xnew
+  }
+}
+
+laplace.log.likelihood.newton(0.21)
+
+
+
+# Newton 2
+
+f <- function(mu){
+  (sqrt(2)/sigma)*sum(abs(laplace_data-mu))
+}
+
+
+newton <- function(f, tol=1E-12,x0=0.1,N=50) {
+  h <- 0.00000001
+  i <- 1; x1 <- x0
+  p <- numeric(N)
+  while (i<=N) {
+    df.dx <- (f(x0+h)-f(x0-h))/(2*h)
+    x1 <- (x0-(f(x0)/df.dx))
+    p[i] <- x1
+    i <- i + 1
+    if (abs(x1-x0) < tol) break
+    x0 <- x1
+  }
+  return(p[1:(i-1)])
+}
+
+newton(f)
+
+laplace_data <- laplace.data.20
+newton(f)
+```
+
+According to the [documentation](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/optimize), optimise() method uses somewhat a combination of golden section search and successive parabolic interpolation. The algorithm starts with an initial interval and evaluates the function at two points within this interval. The points are chosen according to the golden section ratio $φ = (1 + √5) / 2$, which ensures that the interval contracts efficiently.  After the initial evaluations, the algorithm performs successive parabolic interpolations to refine the location of the maximum. This technique utilizes information from previous function evaluations to approximate the maximum more accurately. We get very close optimum results with the corresponding data.
+
+Newton-Raphson method:
+\[x_{k+1} = x_k - Q_k\]
+\[Q_k = \frac{f'(x_k)}{f''(x_k)}\]
+
+The method tends to converge if the following condition holds true:
+\[|f(x)f''(x)| < |f'(x)|^2\]
+
+Using the central difference approximation for the derivative:
+\[Q_k = \frac{h}{2} \left[ \frac{f(x + h) - f(x - h)}{f(x + h) - 2f(x) + f(x - h)} \right]\]
 
