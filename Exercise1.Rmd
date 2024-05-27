@@ -29,6 +29,7 @@ Go to UCI Machine learning repository and download the data on the white wine qu
 ```{r a, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(here)
+library(ggplot2)
 
 white.wine.quality <- read.csv("winequality-white.csv", sep = ";")
 white.wine.quality <- white.wine.quality %>% select(volatile.acidity, residual.sugar, 
@@ -296,7 +297,7 @@ qqline(white.wine.quality$pH)
 
 ```
 
-Good wine and all wine datasets seem to have a lighter left tail and heavier right tail than the theoretical normal distribution. Bad wine seems to only have lighter right tail but left tail seems to be more or less similar to the normal distribution.
+Good wine and all wine datasets seem to have a lighter left tail and heavier right tail than the theoretical normal distribution. Bad wine seems to only have heavier right tail but left tail seems to be more or less similar to the normal distribution.
 
 ```{r ppplot.theoretical}
 
@@ -422,7 +423,7 @@ legend("bottomright", legend=c("Good Wine (ECDF)", "Bad Wine (ECDF)", "Good Wine
 
 On the ECDF we can see that up to a certain point, about to the pH value 3.1, good and bad wine pHs follow a similar distribution. Afterwards the gap increases as there are less bad wines with higher pH values. Additionally, bad wines seem to have a larger confidence bands on tails compared to good wines.
 
-## Maximum likelihood estimation
+## Maximum likelihood Estimation
 Let X be Laplace distributed with parameters (µ, σ)
 t ∈ R × (0, ∞), i.e., X has density
 
@@ -690,7 +691,122 @@ cat("Variance of MLEs using quantile for n = 1000:", variance_quantile, "\n")
 cat("Variance of MLEs using Newton-Raphson for n = 1000:", variance_newton, "\n")
 ```
 
+## Linear Regression
 
+#### Dataset
+Go to Kaggle.com and download the data on house prices. This dataset contains house sale prices for King County, which includes Seattle. It includes homes sold between May 2014 and May 2015. There are altogether 19 variables, but we will consider in the analysis only the following ones:
+
+-   price: Price
+-   bedrooms: Number of bedrooms
+-   bathrooms: Number of bathrooms per bedroom
+-   sqft_living: Square footage of the home
+-   floors: Total floors in house
+-   view: Has been viewed (1 for viewed; 0 for not viewed)
+-   condition: How good is the condition (from 1 to 5)
+-   grade: Grade given to the housing unit based on King County grading system (from 1 to 13)
+-   yr_built: Year the house was built
+
+```{r}
+kc_house_data <- read.csv("archive/kc_house_data.csv")
+
+kc_house_data <- kc_house_data %>%
+  select(price, bedrooms, bathrooms,
+         sqft_living,
+         floors,
+         view,
+         condition,
+         grade,
+         yr_built)
+
+head(kc_house_data)
+```
+
+#### Exercises
+
+1-) Estimate a linear model with the response variable price and all remaining variables as covariates. Are all variables significant? How large is R2 and how can this be interpreted?
+Perform the residual analysis to validate the model. Are there any departures from the linear regression model assumptions?
+
+```{r}
+model <- lm(price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built, data = kc_house_data)
+
+summary(model)
+```
+
+The estimated effect of each predictor on the response variable (price). For instance, each additional bedroom decreases the price by approximately 40,650 dollars, while each additional bathroom increases it by about 47,690 dollars. Pr(>|t|): The p-value associated with the t-statistic, testing the null hypothesis that the coefficient is equal to zero (no effect). A lower p-value (typically < 0.05) indicates that the predictor is statistically significant. All variables here are highly significant (p-values < 2e-16), suggesting strong evidence against the null hypothesis. 
+R-squared, the proportion of variance in the response variable explained by the predictors. Here, 63.59% of the variance in price is explained by the model. Adjusted R-squared is adjusted for the number of predictors in the model, providing a more accurate measure when multiple predictors are used.
+The summary indicates a strong model fit, with all predictors being statistically significant and the model explaining a substantial portion of the variance in house prices. However, the relatively high residual standard error suggests that while the model captures a significant portion of the variability, there is still considerable unexplained variation in house prices.
+
+```{r}
+par(mfrow = c(2, 2))
+plot(model)
+```
+On the Residuals vs Fitted plot, homoscedasticity of ordinary least squares estimation is clearly violated. Variance in residuals increases as fitted values increase. We can additionally support the violation of homoscedasticity by looking at the crookedness of Scale-Location plot. Q-Q plot of residuals is violated too. There are strong lower and upper tails. On the Residuals vs Leverage plot, even though there are points that are close to boundaries, most of them are within the range. So we can say that there are not many influential or outlier cases in linear regression analysis.
+
+2-) Produce a histogram and a QQ-plot of the response variable price, as well as of its logtransform log(price). Compare both distributions to the normal one. Fit now a linear model with the response variable log(price). Compare the estimated model with the one from (a) in terms of R2, significance and effect of covariates and model fit (via residual analysis). Which model is more adequate?
+
+```{r}
+
+kc_house_data$log_price <- log(kc_house_data$price)
+
+par(mfrow = c(2, 2))
+# Histogram of price
+hist(kc_house_data$price, main = "Histogram of Price", xlab = "Price", breaks = 30)
+
+# QQ-plot of price
+qqnorm(kc_house_data$price, main = "QQ-Plot of Price")
+qqline(kc_house_data$price)
+
+# Histogram of log(price)
+hist(kc_house_data$log_price, main = "Histogram of Log(Price)", xlab = "Log(Price)", breaks = 30)
+
+# QQ-plot of log(price)
+qqnorm(kc_house_data$log_price, main = "QQ-Plot of Log(Price)")
+qqline(kc_house_data$log_price)
+
+```
+
+Both the Histogram and QQ-Plot of price shows a very high right tail. Log(price) still has a slightly heavy tail but it is considerably low.
+
+```{r}
+# Fit the linear model with log(price) as response
+model_log_price <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built, data = kc_house_data)
+
+# Summary of the model
+summary(model_log_price)
+```
+
+The R-squared values are slightly higher in the log model, indicating that this model explains a bit more variance in the response variable compared to the original model. In both models, all predictors are statistically significant with p-values < 2e-16. The t-values for the predictors are generally higher in the log model, suggesting stronger relationships between predictors and the log-transformed response variable. In the log transformed models, the interpretation of coefficients is slightly different. Following the bathroom independent variable, each unit of increase now means, the dependent variable is multiplied by $e^(169.3)$.
+
+```{r}
+par(mfrow = c(2, 2))
+plot(model_log_price)
+```
+
+Residuals vs Fitted and Scale-Location plots shows that homoscedasticity problem is highly resolved. Q-Q Plot also follows a straight line. And we cannot even see the most of dashed lines in Residuals vs Leverage. The point 12778 seems pretty close to the one below tho.
+
+In summary, the model with log(price) as the response variable appears to be more appropriate as it:
+
+-   Has a higher R-squared value, indicating a better fit.
+-   Shows stronger relationships between predictors and the response variable.
+-   Demonstrates improved residual distribution, suggesting fewer outliers and a more consistent error structure.
+
+3-) In the model from (b) interpret the effect of each covariate on the response. Plot each covariate against log(price). Is the assumption of the linear dependence between covariates and
+response plausible for all covariates? Add to the model from (b) squared terms for yr_built
+and sqft_living. Are these terms signifficant? Does adding these two terms improve the
+model fit in terms of R2?
+
+```{r , warning=FALSE, message=FALSE}
+covariates <- c("bedrooms", "bathrooms", "sqft_living", "floors", "view", "condition", "grade", "yr_built")
+
+# Create plots
+for (var in covariates) {
+  p <- ggplot(kc_house_data, aes_string(x = var, y = "log_price")) +
+    geom_point(alpha = 0.3) +
+    geom_smooth(method = "lm", col = "blue") +
+    labs(title = paste("Log(price) vs", var), x = var, y = "Log(price)")
+  print(p)
+}
+```
 
 
 References
