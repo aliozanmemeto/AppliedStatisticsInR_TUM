@@ -30,6 +30,8 @@ Go to UCI Machine learning repository and download the data on the white wine qu
 library(tidyverse)
 library(here)
 library(ggplot2)
+library(ISLR)
+library(glmnet)
 
 white.wine.quality <- read.csv("winequality-white.csv", sep = ";")
 white.wine.quality <- white.wine.quality %>% select(volatile.acidity, residual.sugar, 
@@ -129,29 +131,9 @@ We can support the pattern we encountered in the previous question. It is highly
 
 ```{r qqplot}
 
-range_values <- range(c(good.wine$residual.sugar, bad.wine$residual.sugar))
-
-# Generate QQ-plot for good quality wine with same axis range
-#ggplot(data = good.wine, aes(sample = residual.sugar)) +
-#  geom_qq() +
-#  geom_abline(slope = 1, intercept = 0, color = "red") +
-#  xlim(range_values) + ylim(range_values) +
-#  labs(title = "QQ-Plot for Residual Sugar in Good Quality White Wine")
-  
-# Generate QQ-plot for bad quality wine with same axis range
-#ggplot(data = bad.wine, aes(sample = residual.sugar)) +
-#  geom_qq() +
-#  geom_abline(slope = 1, intercept = 0, color = "red") +
-#  xlim(range_values) + ylim(range_values) +
-#  labs(title = "QQ-Plot for Residual Sugar in Bad Quality White Wine")
-bad.wine.sorted <- sort(bad.wine$residual.sugar)
-good.wine.sorted.bwquantiles <- sort(quantile(good.wine$residual.sugar,
-                           probs=ppoints(bad.wine$residual.sugar)))
-
-range_values <- range(c(bad.wine.sorted, good.wine.sorted.bwquantiles))
-plot(bad.wine.sorted,good.wine.sorted.bwquantiles,
-     xlim = range_values, ylim = range_values, abline(0,1))
-
+qqplot(bad.wine$residual.sugar,good.wine$residual.sugar, main = "QQ-plot: Good vs Bad Wines",
+       xlab = "Residual Sugar - Good Wines", ylab = "Residual Sugar - Bad Wines")
+abline(0, 1, col = "red")  # Add y = x line
 ```
 
 We can observe that the residual sugar distribution of good wine is more right-skewed than that of bad wine. Additionally, we can identify those extreme values in the distribution of good wines.
@@ -160,14 +142,30 @@ We can observe that the residual sugar distribution of good wine is more right-s
 styles and add a legend. Interpret the results.
 
 ```{r ecdf}
-plot(ecdf(good.wine$residual.sugar), verticals=TRUE, do.points=FALSE, main = "ECDFs of Residual Sugar")
-plot(ecdf(bad.wine$residual.sugar), verticals=TRUE, do.points=FALSE, add=TRUE, col='brown'
+ecdf.func <- function(data) { 
+  Length <- length(data) 
+  sorted <- sort(data) 
+  
+  ecdf <- rep(0, Length) 
+  for (i in 1:Length) { 
+    ecdf[i] <- sum(sorted <= sorted[i]) / Length 
+  } 
+  return(list(sorted = sorted, ecdf = ecdf))
+}
+
+ecdf.good.rs <- ecdf.func(good.wine$residual.sugar)
+
+plot(ecdf.good.rs$sorted,ecdf.good.rs$ecdf, type="s", main = "ECDFs of Residual Sugar")
+
+ecdf.bad.rs <- ecdf.func(bad.wine$residual.sugar)
+plot(ecdf.bad.rs$sorted,ecdf.bad.rs$ecdf, type="s", col='brown'
      , lty=2)
 legend("bottomright", legend = c("Good Quality", "Bad Quality"),
        col = c("black", "brown"), lty = c(1, 2))
 ```
 
-While the brown plot represents the ECDF of residual sugar for bad wine, the black one represents that of good wine. From the ECDF, we can identify where the most values occur. It's evident that there are more values for good wine than for bad wine. However, up to a certain point, the number of good and bad wines is similar. Therefore, for lower values of residual sugar, we can say they distribute similarly.
+Here the definition of ECDF is important. I will simply use the one in the lecture in the rest of the report.
+While the brown plot represents the ECDF of residual sugar for bad wine, the black one represents that of good wine. From the ECDF, we can identify where the most values occur. It's evident that there are more values of lower residual sugar for good wine than for bad wine. However, up to a certain point, we can say they distribute similarly. Afterwards, bad quality wines usually have more sugar.
 
 3.  Consider now volatile.acidity for good and bad wines. Use boxplots, histograms, QQplots, summary statistics and empirical distribution functions to compare this variable for
 good and bad wines. Comment on the results.
@@ -215,14 +213,9 @@ hist(bad.wine$volatile.acidity,
      xlab = "Volatile Acidity")
 
 
-bad.wine.sorted <- sort(bad.wine$volatile.acidity)
-good.wine.sorted.bwquantiles <- sort(quantile(good.wine$volatile.acidity,
-                           probs=ppoints(bad.wine$volatile.acidity)))
-
-range_values <- range(c(bad.wine.sorted, good.wine.sorted.bwquantiles))
-
-plot(bad.wine.sorted,good.wine.sorted.bwquantiles,
-     xlim = range_values, ylim = range_values, abline(0,1))
+qqplot(bad.wine$volatile.acidity, good.wine$volatile.acidity, main = "QQ-plot: Good vs Bad Wines",
+       xlab = "Volitile Acidity - Bad Wines", ylab = "Volitile Acidity - Good Wines")
+abline(0, 1, col = "red")  # Add y = x line
 
 white.wine.quality %>%
   group_by(good) %>%
@@ -233,8 +226,12 @@ white.wine.quality %>%
                         min.va = min(volatile.acidity),
                         max.va = max(volatile.acidity))
 
-plot(ecdf(good.wine$volatile.acidity), verticals=TRUE, do.points=FALSE, main = "ECDFs of Volatile Acidity")
-plot(ecdf(bad.wine$volatile.acidity), verticals=TRUE, do.points=FALSE, add=TRUE, col='brown'
+
+ecdf.good.va <- ecdf.func(bad.wine$volatile.acidity)
+plot(ecdf.good.va$sorted, ecdf.good.va$ecdf, type="s", main = "ECDFs of Volatile Acidity")
+
+ecdf.bad.va <- ecdf.func(bad.wine$volatile.acidity)
+plot(ecdf.bad.va$sorted, ecdf.bad.va$ecdf, type="s", col='brown'
      , lty=2)
 legend("bottomright", legend = c("Good Quality", "Bad Quality"),
        col = c("black", "brown"), lty = c(1, 2))
@@ -247,7 +244,7 @@ When we look at histograms, transitioning from Sturges' Rule to Scott's Rule, th
 
 Looking at the QQ plot, we can see that the values of good wine are more concentrated or have less variance than those for bad wines because of the slope of the QQ plot. Additionally since values are below the y=x line, the good wine group is expected to have lower mean.
 
-On the ECDF plot, we can see that there are more values for good wine than for bad wine. This is also consistent with the fact that there were more bad wine values below the good wine values on the QQ plot.
+On the ECDF plot, we can see that there are more values of lower volatile acidity for good wine than for bad wine. This is also consistent with the fact that there were more bad wine values below the good wine values on the QQ plot.
 
 ## Examine the distribution of data
 
@@ -260,6 +257,15 @@ Consider the dataset from the previous exercise and its variable pH.
 1- Plot a histogram of pH for all wines and add to the plot a normal density, estimating the parameters from the data. Produce same histograms with corresponding normal densities for good and bad wines separately. Do you observe any differences in the distributions?
 
 ```{r hist.FreedmanDiaconis.pH}
+
+hist(good.wine$pH,
+     freq = FALSE,
+     main = "Histogram of pH for All Wines with Normal Density Estimation",
+     xlab = "pH")
+curve(dnorm(x, mean = mean(white.wine.quality$pH), sd = sd(white.wine.quality$pH)), 
+      add = TRUE, 
+      col = "blue", 
+      lwd = 2)
 
 hist(good.wine$pH,
      freq = FALSE,
@@ -281,7 +287,7 @@ curve(dnorm(x, mean = mean(bad.wine$pH), sd = sd(bad.wine$pH)),
 
 ```
 
-Distributions seem more or less normal and similar. The pH of bad wine is slightly spykier than that of the pH of good wine. 
+Distributions seem more or less normal and similar. The pH of bad wine is slightly spikier than that of the pH of good wine. 
 
 2- Generate QQ-plots of pH for good, bad and all wines to compare empirical quantiles of the samples to the theoretical quantiles of a normal distribution. Produce PP-plots for all three datasets. Comment on the differences between QQ-plots and PP-plots. Do you think all samples follow a normal distribution?
 
@@ -297,6 +303,7 @@ qqline(white.wine.quality$pH)
 
 ```
 
+qqnorm() function plots the emprical distribution using ppoints() function in R. ppoints() uses (1:m - a)/(m + (1-a)-a) where m is either n, if length(n)==1, or length(n). And a by default a = if(n <= 10) 3/8 else 1/2).
 Good wine and all wine datasets seem to have a lighter left tail and heavier right tail than the theoretical normal distribution. Bad wine seems to only have heavier right tail but left tail seems to be more or less similar to the normal distribution.
 
 ```{r ppplot.theoretical}
@@ -304,19 +311,19 @@ Good wine and all wine datasets seem to have a lighter left tail and heavier rig
 standardized.data <- (good.wine$pH - mean(good.wine$pH)) / sd(good.wine$pH)
 probDist <- pnorm(standardized.data)
 plot(sort(probDist), ppoints(length(standardized.data)), 
-     main="QQ-plot of pH for Good Wine")
+     main="PP-plot of pH for Good Wine")
 abline(0,1)
 
 standardized.data <- (bad.wine$pH - mean(bad.wine$pH)) / sd(bad.wine$pH)
 probDist <- pnorm(standardized.data)
 plot(sort(probDist), ppoints(length(standardized.data)), 
-     main="QQ-plot of pH for Bad Wine")
+     main="PP-plot of pH for Bad Wine")
 abline(0,1)
 
 standardized.data <- (white.wine.quality$pH - mean(white.wine.quality$pH)) / sd(white.wine.quality$pH)
 probDist <- pnorm(standardized.data)
 plot(sort(probDist), ppoints(length(standardized.data)), 
-     main="QQ-plot of pH for All Wine")
+     main="PP-plot of pH for All Wine")
 abline(0,1)
 
 ```
@@ -327,37 +334,26 @@ The only difference between QQ and PP plot is that considering ECDFs on the same
 3-) Plot the empirical distribution functions Fn for all three datasets. Add the pointwise confidence bands for α = 0.05 using the central limit theorem and Slutzky’s lemma (ensure that
 the confidence bands are in [0; 1]).
 
-```{r ecdf.pwbands}
-ecdf.func <- function(data) { 
-  Length <- length(data) 
-  sorted <- sort(data) 
-  
-  ecdf <- rep(0, Length) 
-  for (i in 1:Length) { 
-    ecdf[i] <- sum(sorted <= data[i]) / Length 
-  } 
-  return(ecdf) 
-}
-ecdf.pwbands <- function(data, title){
-  Fn <- ecdf(data)
+```{r ecdf.pwbands.plot}
+ecdf.pwbands.plot <- function(data, title){
   ecdf_data <- ecdf.func(data)
   
-  z <- sqrt(ecdf_data*(1-ecdf_data) / length(ecdf_data))
+  z <- sqrt(ecdf_data$ecdf*(1-ecdf_data$ecdf) / length(ecdf_data$ecdf))
   
-  plot(Fn, col="darkgreen", lwd=2, main = title)
+  plot(ecdf_data$sorted,ecdf_data$ecdf , col="lightgreen",type = "s", lwd=2, main = title)
   
-  upper_bound <- Fn(sort(data)) + 1.96 * z
-  lower_bound <- Fn(sort(data)) - 1.96 * z
+  upper_bound <- ecdf_data$ecdf + 1.96 * z
+  lower_bound <- ecdf_data$ecdf - 1.96 * z
   upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
   lower_bound <- ifelse(lower_bound < 0, 0, lower_bound)
   
-  lines(sort(data), upper_bound, col="salmon", lwd=2)
-  lines(sort(data), lower_bound, col="salmon", lwd=2)
+  lines(ecdf_data$sorted, upper_bound, lty = "dashed", col="salmon", lwd=2)
+  lines(ecdf_data$sorted, lower_bound, lty = "dashed", col="salmon", lwd=2)
 }
 
-ecdf.pwbands(good.wine$pH, "Good Wine pH ECDF and Pointwise Confidence Intervals")
-ecdf.pwbands(bad.wine$pH, "Bad Wine pH ECDF and Pointwise Confidence Intervals")
-ecdf.pwbands(good.wine$pH, "All Wine pH ECDF and Pointwise Confidence Intervals")
+ecdf.pwbands.plot(good.wine$pH, "Good Wine pH ECDF and Pointwise Confidence Intervals")
+ecdf.pwbands.plot(bad.wine$pH, "Bad Wine pH ECDF and Pointwise Confidence Intervals")
+ecdf.pwbands.plot(white.wine.quality$pH, "All Wine pH ECDF and Pointwise Confidence Intervals")
 
 ```
 
@@ -365,63 +361,70 @@ ecdf.pwbands(good.wine$pH, "All Wine pH ECDF and Pointwise Confidence Intervals"
 confidence bands for α = 0.05. Compare to the bands obtained in (3).
 
 ```{r ecdf.ksbands}
-ecdf.ksbands <- function(data, title){
-  Fn <- ecdf(data)
-  ecdf_data <- ecdf.func(data)
 
-  plot(Fn, col="darkgreen", lwd=2, main = title)
+ecdf.ksbands <- function(data) {
+  ecdf_data <- ecdf.func(data)
   
-  D <- 1.3581/ sqrt(length(data))
-  upper_bound <- Fn(sort(data)) + D
-  lower_bound <- Fn(sort(data)) - D
+  D <- 1.3581 / sqrt(length(data))
+  upper_bound <- ecdf_data$ecdf + D
+  lower_bound <- ecdf_data$ecdf - D
   upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
   lower_bound <- ifelse(lower_bound < 0, 0, lower_bound)
   
-  lines(sort(data), upper_bound, col="salmon", lwd=2)
-  lines(sort(data), lower_bound, col="salmon", lwd=2)
+  return(list(sorted = ecdf_data$sorted, ecdf = ecdf_data$ecdf, upper_bound = upper_bound, lower_bound = lower_bound))
 }
 
-ecdf.ksbands(good.wine$pH, "Good Wine pH ECDF and Uniform Confidence Intervals")
-ecdf.ksbands(bad.wine$pH, "Bad Wine pH ECDF and Uniform Confidence Intervals")
-ecdf.ksbands(good.wine$pH, "All Wine pH ECDF and Uniform Confidence Intervals")
 
+ecdf.good.ph.ks <- ecdf.ksbands(good.wine$pH)
+
+plot(ecdf.good.ph.ks$sorted, ecdf.good.ph.ks$ecdf,type = "s", col="lightgreen", lwd=2, main = "Good Wine pH ECDF and Uniform Confidence Intervals")
+lines(ecdf.good.ph.ks$sorted, ecdf.good.ph.ks$upper_bound, col="salmon", lwd=2, lty = "dashed")
+lines(ecdf.good.ph.ks$sorted, ecdf.good.ph.ks$lower_bound, col="salmon", lwd=2, lty = "dashed")
+  
+ecdf.bad.ph.ks <- ecdf.ksbands(good.wine$pH)
+
+plot(ecdf.bad.ph.ks$sorted, ecdf.bad.ph.ks$ecdf,type = "s", col="lightgreen", lwd=2, main = "Bad Wine pH ECDF and Uniform Confidence Intervals")
+lines(ecdf.bad.ph.ks$sorted, ecdf.bad.ph.ks$upper_bound, col="salmon", lwd=2, lty = "dashed")
+lines(ecdf.bad.ph.ks$sorted, ecdf.bad.ph.ks$lower_bound, col="salmon", lwd=2, lty = "dashed")
+  
+ecdf.all.ph.ks <- ecdf.ksbands(white.wine.quality$pH)
+
+plot(ecdf.all.ph.ks$sorted, ecdf.all.ph.ks$ecdf, type = "s", col="lightgreen", lwd=2, main = "All Wine pH ECDF and Uniform Confidence Intervals")
+lines(ecdf.all.ph.ks$sorted, ecdf.all.ph.ks$upper_bound, col="salmon", lwd=2, lty = "dashed")
+lines(ecdf.all.ph.ks$sorted, ecdf.all.ph.ks$lower_bound, col="salmon", lwd=2, lty = "dashed")
+  
 ```
 
 Kolmogorov-Smirnov bandwidth for sample size over 35 with 0.05 alpha value is [1.36/sqrt(N)](https://real-statistics.com/statistics-tables/kolmogorov-smirnov-table/) = 0.02382667. The problem with pointwise confidence intervals is, that if we compute them for a lot of points, we accumulate errors. Uniform confidence bands are slightly wider. 
 
 5- Plot the empirical distribution functions of pH for good and bad wines together with the uniform confidence bands in one plot. What can you conclude from this plot?
 
-```{r ecdf.ksbands.good.bad}
-ecdf.ksbands <- function(data, title, col){
-  Fn <- ecdf(data)
-  
-  D <- 1.3581/ sqrt(length(data))
-  upper_bound <- Fn(sort(data)) + D
-  lower_bound <- Fn(sort(data)) - D
-  upper_bound <- ifelse(upper_bound > 1, 1, upper_bound)
-  lower_bound <- ifelse(lower_bound < 0, 0, lower_bound)
-  
-  lines(sort(data), upper_bound, col=col, lwd=2, lty = "dashed")
-  lines(sort(data), lower_bound, col=col, lwd=2, lty = "dashed")
-}
-
+```{r ecdf.ksbands.ph}
 # Create an empty plot with x-axis limits covering the range of both datasets
-plot(ecdf(good.wine$pH), col="darkgreen", lwd=2, main = "Wine pH ECDF and Uniform Confidence Intervals", xlim = range(c(good.wine$pH, bad.wine$pH)))
 
-# Plot ECDFs for both good and bad wine pH
-lines(ecdf(bad.wine$pH), col="darkred", lwd=2)
+good_ph <- ecdf.ksbands(good.wine$pH)
+bad_ph <- ecdf.ksbands(bad.wine$pH)
 
-# Plot confidence intervals for both good and bad wine pH
-ecdf.ksbands(good.wine$pH, "Good Wine pH", col="blue")
-ecdf.ksbands(bad.wine$pH, "Bad Wine pH", col="orange")
+# Plot ECDFs for both good and bad wine pH in a single plot
+plot(good_ph$sorted, good_ph$ecdf, type="s", col="darkgreen", lwd=2, 
+     main="Wine pH ECDF and Uniform Confidence Intervals", xlim = range(c(good.wine$pH, bad.wine$pH)), ylim = c(0, 1), ylab = "ECDF", xlab = "pH")
+
+lines(bad_ph$sorted, bad_ph$ecdf, col="darkred", lwd=2, type="s")
+
+# Add confidence intervals for good wine
+lines(good_ph$sorted, good_ph$upper_bound, col="blue", lwd=2, lty = "dashed")
+lines(good_ph$sorted, good_ph$lower_bound, col="blue", lwd=2, lty = "dashed")
+
+# Add confidence intervals for bad wine
+lines(bad_ph$sorted, bad_ph$upper_bound, col="orange", lwd=2, lty = "dashed")
+lines(bad_ph$sorted, bad_ph$lower_bound, col="orange", lwd=2, lty = "dashed")
 
 # Add a legend
 legend("bottomright", legend=c("Good Wine (ECDF)", "Bad Wine (ECDF)", "Good Wine (Confidence Intervals)", "Bad Wine (Confidence Intervals)"), 
        col=c("darkgreen", "darkred", "blue", "orange"), lwd=2, cex=0.8, lty=c("solid", "solid", "dashed", "dashed"))
-
 ```
 
-On the ECDF we can see that up to a certain point, about to the pH value 3.1, good and bad wine pHs follow a similar distribution. Afterwards the gap increases as there are less bad wines with higher pH values. Additionally, bad wines seem to have a larger confidence bands on tails compared to good wines.
+On the ECDF we can see that up to a certain point, about to the pH value 3.1, good and bad wine pHs follow a similar distribution. Afterwards the gap increases as there are less bad wines with higher pH values. That is the pH of good wines is higher. Additionally, bad wines seem to have a larger confidence bands on tails compared to good wines.
 
 ## Maximum likelihood Estimation
 Let X be Laplace distributed with parameters (µ, σ)
@@ -706,7 +709,7 @@ Go to Kaggle.com and download the data on house prices. This dataset contains ho
 -   grade: Grade given to the housing unit based on King County grading system (from 1 to 13)
 -   yr_built: Year the house was built
 
-```{r}
+```{r house.price}
 kc_house_data <- read.csv("archive/kc_house_data.csv")
 
 kc_house_data <- kc_house_data %>%
@@ -726,7 +729,7 @@ head(kc_house_data)
 1-) Estimate a linear model with the response variable price and all remaining variables as covariates. Are all variables significant? How large is R2 and how can this be interpreted?
 Perform the residual analysis to validate the model. Are there any departures from the linear regression model assumptions?
 
-```{r}
+```{r lm}
 model <- lm(price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built, data = kc_house_data)
 
 summary(model)
@@ -736,7 +739,7 @@ The estimated effect of each predictor on the response variable (price). For ins
 R-squared, the proportion of variance in the response variable explained by the predictors. Here, 63.59% of the variance in price is explained by the model. Adjusted R-squared is adjusted for the number of predictors in the model, providing a more accurate measure when multiple predictors are used.
 The summary indicates a strong model fit, with all predictors being statistically significant and the model explaining a substantial portion of the variance in house prices. However, the relatively high residual standard error suggests that while the model captures a significant portion of the variability, there is still considerable unexplained variation in house prices.
 
-```{r}
+```{r lm.plot}
 par(mfrow = c(2, 2))
 plot(model)
 ```
@@ -744,7 +747,7 @@ On the Residuals vs Fitted plot, homoscedasticity of ordinary least squares esti
 
 2-) Produce a histogram and a QQ-plot of the response variable price, as well as of its logtransform log(price). Compare both distributions to the normal one. Fit now a linear model with the response variable log(price). Compare the estimated model with the one from (a) in terms of R2, significance and effect of covariates and model fit (via residual analysis). Which model is more adequate?
 
-```{r}
+```{r plot.log}
 
 kc_house_data$log_price <- log(kc_house_data$price)
 
@@ -767,7 +770,7 @@ qqline(kc_house_data$log_price)
 
 Both the Histogram and QQ-Plot of price shows a very high right tail. Log(price) still has a slightly heavy tail but it is considerably low.
 
-```{r}
+```{r lm.log}
 # Fit the linear model with log(price) as response
 model_log_price <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built, data = kc_house_data)
 
@@ -777,7 +780,7 @@ summary(model_log_price)
 
 The R-squared values are slightly higher in the log model, indicating that this model explains a bit more variance in the response variable compared to the original model. In both models, all predictors are statistically significant with p-values < 2e-16. The t-values for the predictors are generally higher in the log model, suggesting stronger relationships between predictors and the log-transformed response variable. In the log transformed models, the interpretation of coefficients is slightly different. Following the bathroom independent variable, each unit of increase now means, the dependent variable is multiplied by $e^(169.3)$.
 
-```{r}
+```{r lm.log.plot}
 par(mfrow = c(2, 2))
 plot(model_log_price)
 ```
@@ -792,10 +795,10 @@ In summary, the model with log(price) as the response variable appears to be mor
 
 3-) In the model from (b) interpret the effect of each covariate on the response. Plot each covariate against log(price). Is the assumption of the linear dependence between covariates and
 response plausible for all covariates? Add to the model from (b) squared terms for yr_built
-and sqft_living. Are these terms signifficant? Does adding these two terms improve the
+and sqft_living. Are these terms significant? Does adding these two terms improve the
 model fit in terms of R2?
 
-```{r , warning=FALSE, message=FALSE}
+```{r covariates, warning=FALSE, message=FALSE}
 covariates <- c("bedrooms", "bathrooms", "sqft_living", "floors", "view", "condition", "grade", "yr_built")
 
 # Create plots
@@ -806,6 +809,212 @@ for (var in covariates) {
     labs(title = paste("Log(price) vs", var), x = var, y = "Log(price)")
   print(p)
 }
+```
+
+Variables bathrooms and grade can likely have a linear relationship. But the rest of variables seem to either have a different relationship such as sqft_living or they don't explain any variance in the predictor variables such as yr_built.
+
+```{r squared.lm}
+kc_house_data <- kc_house_data %>%
+  mutate(yr_built_sq = yr_built^2,
+         sqft_living_sq = sqft_living^2,
+         # Extended additional variables
+         floors_sq = floors^2,
+         grade_sq = grade^2)
+
+# Fit the new model with squared terms
+model_log_price_sq <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built + yr_built_sq + sqft_living_sq, data = kc_house_data)
+
+summary(model_log_price_sq)
+```
+
+The terms are significant. And the R2 value is slightly improved from 0.6426 to 0.6492. Adjusted R-Squared is increased as well.
+
+4-) Now we would like to compare how well models from (b) and (c) make prediction. For this divide the dataset into a training and a test set. Sample randomly 10 806 rows to include into the training set and the rest will be the test set. To ensure comparability of the results set.seed(1122) before sampling. Fit both models on the training set and make prediction on the test set. Calculate the mean squared difference between predicted values and values of log(price) from the test set for each model. Which prediction error is smaller? Try to extend the model to improve the prediction: my best model gives prediction error of 0.09557445.
+
+```{r mse.extention}
+set.seed(1122)
+training_indices <- sample(seq_len(nrow(kc_house_data)), size = 10806)
+training_set <- kc_house_data[training_indices, ]
+test_set <- kc_house_data[-training_indices, ]
+
+model_log_price_train <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built, data = training_set)
+
+model_log_price_sq_train <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built + yr_built_sq + sqft_living_sq, data = training_set)
+
+pred_log_price <- predict(model_log_price_train, newdata = test_set)
+
+pred_log_price_sq <- predict(model_log_price_sq_train, newdata = test_set)
+
+mse_log_price <- mean((test_set$log_price - pred_log_price)^2)
+mse_log_price
+
+mse_log_price_sq <- mean((test_set$log_price - pred_log_price_sq)^2)
+mse_log_price_sq
+
+summary(model_log_price_sq_train)
+
+# Extention
+
+model_log_price_new <- lm(log_price ~ bedrooms +  bedrooms : bathrooms  +  bathrooms : grade + sqft_living +sqft_living:floors + grade + floors  + condition + yr_built + yr_built_sq + sqft_living_sq +view + view:bathrooms  + floors_sq +grade_sq, data = training_set)
+
+pred_log_price_new <- predict(model_log_price_new, newdata = test_set)
+
+mse_log_price_new <- mean((test_set$log_price - pred_log_price_new)^2)
+
+print(paste0("Prediction error: ", mse_log_price_new))
+summary(model_log_price_new)
+
+```
+
+Although the model model_log_price_new  or pred_log_price_sq performs slightly better, it usually does not mean the model generalizes better. I particularly had to try many different interaction effects or polynomial fits on this split. With different splits, different interactions or effects can give different results.
+
+
+## Penalized Regression
+
+#### Dataset
+
+Consider the dataset hitters.dat on baseball players that has been analysed in the book An introduction to statistical learning by G. James, D. Witten, T. Hastie and R. Tibshirani (2013, Springer). It contains the following 20 variables:
+
+-   AtBat: Number of times at bat in 1986
+-   Hits: Number of hits in 1986
+-   HmRun: Number of home runs in 1986
+-   Runs: Number of runs in 1986
+-   RBI: Number of runs batted in 1986
+-   Walks: Number of walks in 1986
+-   Years: Number of years in the major leagues
+-   CAtBat: Number of times at bat during his career
+-   CHits: Number of hits during his career
+-   CHmRun: Number of home runs during his career
+-   CRuns: Number of runs during his career
+-   CRBI: Number of runs batted in during his career
+-   CWalks: Number of walks during his career
+-   League: A factor with levels A and N indicating player’s league at the end of 1986
+-   Division: A factor with levels E and W indicating player’s division at the end of 1986
+-   PutOuts: Number of put outs in 1986
+-   Assists: Number of assists in 1986
+-   Errors: Number of errors in 1986
+-   Salary: 1987 annual salary on opening day in thousands of dollars
+-   NewLeague: A factor with levels A and N indicating player’s league at the beginning of 1987
+
+We would like to explain Salary of a player using the other variables. The function glmnet in the package glmnet is used to fit both ridge and lasso regression. Supply α = 0 for ridge and α = 1 for
+lasso when calling glmnet. Make sure you understand the interpretation of λ in both cases (note that it is not the same for lasso and ridge!). Read the documentation ?glmnet to understand what
+is the exact form of the objective function that is being minimised.
+
+
+1-) Load the dataset into R and create a new dataset containing only those players for which all
+data is available.
+
+```{r hitters.df}
+Hitters <- Hitters[complete.cases(Hitters),]
+
+```
+
+2-) Find the condition number (ratio between largest and smallest eigenvalue) of $X^T X$, where y is the salary and X represents all the other variables. What can you say about the condition number? Does it help if you standardise the design matrix, such that its columns (without the intercept) have mean zero and variance one?
+
+```{r condition.number.hitters}
+
+x = model.matrix(Salary~., Hitters)[,-1]
+condition.number <- function (x){
+  z <- t(x) %*% x
+  print(max(svd(z)$d)/min(svd(z)$d))
+  print(kappa(z, exact = T))
+  }
+
+condition.number(x)
+condition.number(scale(x))
+
+```
+
+The condition number is a good indicator of how close is a matrix to be singular. The larger the condition number the closer we are to singularity. A matrix with large condition number is nearly singular, whereas a matrix with a condition number close to 1 is far from being singular.
+Let $\boldsymbol{x}$ be the solution of {\bf A} \boldsymbol{x} = \boldsymbol{b}
+ be the solution of the perturbed problem ${\bf A} \hat{\boldsymbol{x}} = \boldsymbol{b} + \Delta \boldsymbol{b}$ . Let $\Delta \boldsymbol{x} = \hat{\boldsymbol{x}} - \boldsymbol{x}$ be the absolute error in output. Then we have ${\bf A} \boldsymbol{x} + {\bf A} \Delta \boldsymbol{x} = \boldsymbol{b} + \Delta \boldsymbol{b}$, so ${\bf A} \Delta \boldsymbol{x} = \Delta \boldsymbol{b}.$ Now we want to see how the relative error in output $\left(\frac{\|\Delta \boldsymbol{x}\|}{\|\boldsymbol{x}\|}\right)$ is related to the relative error in input $\left(\frac{\|\Delta \boldsymbol{b}\|}{\|\boldsymbol{b}\|}\right)$
+
+\[
+\begin{align}
+\frac{\|\Delta \boldsymbol{x}\| / \|\boldsymbol{x}\|}{\|\Delta \boldsymbol{b}\| / \|\boldsymbol{b}\|} &= \frac{\|\Delta \boldsymbol{x}\| \|\boldsymbol{b}\|}{\|\boldsymbol{x}\| \|\Delta \boldsymbol{b}\|}\\
+&= \frac{\|{\bf A}^{-1} \Delta \boldsymbol{b}\| \|{\bf A} \boldsymbol{x}\|}{\|\boldsymbol{x}\| \|\Delta \boldsymbol{b}\|}\\
+&\le \frac{\|{\bf A}^{-1}\| \|\Delta \boldsymbol{b}\| \|{\bf A}\| \|\boldsymbol{x}\|}{\|\boldsymbol{x}\| \|\Delta \boldsymbol{b}\|} \\
+&= \|{\bf A}^{-1}\| \|{\bf A}\|\\ &= \text{cond}({\bf A})
+\end{align}\]
+
+where we used $\|{\bf A}\boldsymbol{x}\| \le \|{\bf A}\| \|\boldsymbol{x}\|, \forall \boldsymbol{x}$.
+Then
+\[
+\frac{\|\Delta \boldsymbol{x}\|}{\|\boldsymbol{x}\|} \le \text{cond}({\bf A})\frac{\|\Delta \boldsymbol{b}\|}{\|\boldsymbol{b}\|}  \qquad (1)
+\]
+
+Therefore, if we know the relative error in input, then we can use the condition number of the system to obtain an upper bound for the relative error of our computed solution (output). For more information, check out the [link](https://courses.engr.illinois.edu/cs357/sp2024/notes/ref-10-condition.html).
+
+
+When the matrix is standardized, condition number decreases drastically. In this [answer](https://stats.stackexchange.com/questions/243000/cause-of-a-high-condition-number-in-a-python-statsmodels-regression#comment462188_243000) the reason for a high condition number is clearly explained. This is because they're fitting a line to the points and then projecting the line all the way back to the origin (x=0) to find the y-intercept. That y-intercept will be very sensitive to small movements in the data points. The condition number takes into account high sensitivity in either fitted parameter to the input data, hence the high condition number when all of the data are far to one side of x=0.
+
+ 
+3-) Fit a standard linear model (no regularisation) and a ridge regression with λ = 70. Compare the size of the coefficients in the two models. What do you observe?
+
+```{r lm.hitters}
+y = Hitters %>%
+  select(Salary) %>%
+  unlist() %>%
+  as.numeric()
+
+# Fit a standard linear model
+lm_model <- lm(Salary ~ ., data = Hitters)
+
+# Get the coefficients of the linear model
+lm_coefficients <- coef(lm_model)
+print("Linear Model Coefficients:")
+print(lm_coefficients)
+
+
+# Fit a ridge regression model with lambda = 70
+ridge_model <- glmnet(x, y, alpha = 0, lambda = 70)
+
+# Get the coefficients of the ridge regression model
+ridge_coefficients <- coef(ridge_model)
+print("Ridge Regression Coefficients with lambda = 70:")
+print(ridge_coefficients)
+
+
+
+# Standard Linear Model Coefficients
+lm_coefficients <- coef(lm_model)
+lm_coefficients <- as.data.frame(lm_coefficients)
+colnames(lm_coefficients) <- "LinearModel"
+
+# Ridge Regression Coefficients with lambda = 70
+ridge_coefficients <- coef(ridge_model)
+ridge_coefficients <- as.data.frame(as.matrix(ridge_coefficients))
+colnames(ridge_coefficients) <- "RidgeRegression"
+
+# Combine the data frames, making sure row names are kept as a column
+comparison_df <- data.frame(
+  Variable = rownames(lm_coefficients),
+  LinearModel = lm_coefficients$LinearModel,
+  RidgeRegression = ridge_coefficients$RidgeRegression
+)
+
+comparison_df_tidy <- pivot_longer(
+  comparison_df,
+  cols = c("LinearModel", "RidgeRegression"),
+  names_to = "Model",
+  values_to = "Coefficient"
+)
+
+
+ggplot(comparison_df_tidy, aes(x = Variable, y = Coefficient, fill = Model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Comparison of Coefficients: Linear Model vs. Ridge Regression",
+       x = "Variable",
+       y = "Coefficient Value")
+
+```
+
+glm() by default standardizes the data. The importance of standardization in regularized models are thoroughly examined in the exercise before. Here in Ridge Regression, the coefficients are generally smaller, indicating that the regularization term λ is effectively shrinking them. This often results in a model that generalizes better to new data by mitigating multicollinearity and reducing overfitting.
+
+
+```{r empty}
+
 ```
 
 
