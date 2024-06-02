@@ -153,15 +153,18 @@ ecdf.func <- function(data) {
   return(list(sorted = sorted, ecdf = ecdf))
 }
 
+# Calculate ECDFs for good and bad wine residual sugar
 ecdf.good.rs <- ecdf.func(good.wine$residual.sugar)
-
-plot(ecdf.good.rs$sorted,ecdf.good.rs$ecdf, type="s", main = "ECDFs of Residual Sugar")
-
 ecdf.bad.rs <- ecdf.func(bad.wine$residual.sugar)
-plot(ecdf.bad.rs$sorted,ecdf.bad.rs$ecdf, type="s", col='brown'
-     , lty=2)
-legend("bottomright", legend = c("Good Quality", "Bad Quality"),
-       col = c("black", "brown"), lty = c(1, 2))
+
+# Plot ECDF for good wine
+plot(ecdf.good.rs$sorted, ecdf.good.rs$ecdf, type = "s", main = "ECDFs of Residual Sugar", xlab = "Residual Sugar", ylab = "ECDF", col = "black", lty = 1)
+
+# Add ECDF for bad wine
+lines(ecdf.bad.rs$sorted, ecdf.bad.rs$ecdf, type = "s", col = "brown", lty = 2)
+
+# Add legend
+legend("bottomright", legend = c("Good Quality", "Bad Quality"), col = c("black", "brown"), lty = c(1, 2))
 ```
 
 Here the definition of ECDF is important. I will simply use the one in the lecture in the rest of the report.
@@ -227,14 +230,17 @@ white.wine.quality %>%
                         max.va = max(volatile.acidity))
 
 
-ecdf.good.va <- ecdf.func(bad.wine$volatile.acidity)
-plot(ecdf.good.va$sorted, ecdf.good.va$ecdf, type="s", main = "ECDFs of Volatile Acidity")
-
+ecdf.good.va <- ecdf.func(good.wine$volatile.acidity)
 ecdf.bad.va <- ecdf.func(bad.wine$volatile.acidity)
-plot(ecdf.bad.va$sorted, ecdf.bad.va$ecdf, type="s", col='brown'
-     , lty=2)
-legend("bottomright", legend = c("Good Quality", "Bad Quality"),
-       col = c("black", "brown"), lty = c(1, 2))
+
+# Plot ECDF for good wine
+plot(ecdf.good.va$sorted, ecdf.good.va$ecdf, type = "s", main = "ECDFs of Volatile Acidity", xlab = "Volatile Acidity", ylab = "ECDF", col = "black", lty = 1)
+
+# Add ECDF for bad wine
+lines(ecdf.bad.va$sorted, ecdf.bad.va$ecdf, type = "s", col = "brown", lty = 2)
+
+# Add legend
+legend("bottomright", legend = c("Good Quality", "Bad Quality"), col = c("black", "brown"), lty = c(1, 2))
 
 ```
 
@@ -381,7 +387,7 @@ plot(ecdf.good.ph.ks$sorted, ecdf.good.ph.ks$ecdf,type = "s", col="lightgreen", 
 lines(ecdf.good.ph.ks$sorted, ecdf.good.ph.ks$upper_bound, col="salmon", lwd=2, lty = "dashed")
 lines(ecdf.good.ph.ks$sorted, ecdf.good.ph.ks$lower_bound, col="salmon", lwd=2, lty = "dashed")
   
-ecdf.bad.ph.ks <- ecdf.ksbands(good.wine$pH)
+ecdf.bad.ph.ks <- ecdf.ksbands(bad.wine$pH)
 
 plot(ecdf.bad.ph.ks$sorted, ecdf.bad.ph.ks$ecdf,type = "s", col="lightgreen", lwd=2, main = "Bad Wine pH ECDF and Uniform Confidence Intervals")
 lines(ecdf.bad.ph.ks$sorted, ecdf.bad.ph.ks$upper_bound, col="salmon", lwd=2, lty = "dashed")
@@ -560,8 +566,7 @@ Using the central difference approximation for the derivative:
 
 For a small sample size like n=20, even though the log-likelihood function tries to smooth out, it can be highly irregular due to the limited data. This irregularity can cause the Newton-Raphson method (or even optimise) to perform poorly. Both performs well with the sample size 1000 however, newton-raphson does not converge.
 
-4-) Let us now study the distribution of the maximum likelihood estimator. For this, calculate M = 5000 maximum likelihood estimators of µ based on the sample of n = 20 random
-variables generated from the Laplace distribution with µ = 1 and σ = 1. Repeat the same for the sample size n = 1000. Use histograms and QQ-plots to check if both Monte Carlo samples follow a normal distribution. Compare variances of both distributions, comment on the results.
+4-) Let us now study the distribution of the maximum likelihood estimator. For this, calculate M = 5000 maximum likelihood estimators of µ based on the sample of n = 20 random variables generated from the Laplace distribution with µ = 1 and σ = 1. Repeat the same for the sample size n = 1000. Use histograms and QQ-plots to check if both Monte Carlo samples follow a normal distribution. Compare variances of both distributions, comment on the results.
 
 ```{r}
 # Function to find MLE for mu using optimise
@@ -658,8 +663,8 @@ for (i in 1:M) {
   results_newton[i] <- newton_result
 
 }
-results_newton <- subset(results_newton, as.numeric(results_newton) >= 0.8 &
-                          as.numeric(results_newton) <= 1.2)
+results_newton <- subset(results_newton, as.numeric(results_newton) >= -10 &
+                          as.numeric(results_newton) <= 10)
 
 
 results_newton <- as.numeric(results_newton)
@@ -745,7 +750,7 @@ plot(model)
 ```
 On the Residuals vs Fitted plot, homoscedasticity of ordinary least squares estimation is clearly violated. Variance in residuals increases as fitted values increase. We can additionally support the violation of homoscedasticity by looking at the crookedness of Scale-Location plot. Q-Q plot of residuals is violated too. There are strong lower and upper tails. On the Residuals vs Leverage plot, even though there are points that are close to boundaries, most of them are within the range. So we can say that there are not many influential or outlier cases in linear regression analysis.
 
-2-) Produce a histogram and a QQ-plot of the response variable price, as well as of its logtransform log(price). Compare both distributions to the normal one. Fit now a linear model with the response variable log(price). Compare the estimated model with the one from (a) in terms of R2, significance and effect of covariates and model fit (via residual analysis). Which model is more adequate?
+2-) Produce a histogram and a QQ-plot of the response variable price, as well as of its log transform log(price). Compare both distributions to the normal one. Fit now a linear model with the response variable log(price). Compare the estimated model with the one from (a) in terms of R2, significance and effect of covariates and model fit (via residual analysis). Which model is more adequate?
 
 ```{r plot.log}
 
@@ -768,7 +773,7 @@ qqline(kc_house_data$log_price)
 
 ```
 
-Both the Histogram and QQ-Plot of price shows a very high right tail. Log(price) still has a slightly heavy tail but it is considerably low.
+Both the Histogram and QQ-Plot of price shows a very high right tail. Log(price) still has a slightly heavy tail but it is considerably very low.
 
 ```{r lm.log}
 # Fit the linear model with log(price) as response
@@ -814,15 +819,8 @@ for (var in covariates) {
 Variables bathrooms and grade can likely have a linear relationship. But the rest of variables seem to either have a different relationship such as sqft_living or they don't explain any variance in the predictor variables such as yr_built.
 
 ```{r squared.lm}
-kc_house_data <- kc_house_data %>%
-  mutate(yr_built_sq = yr_built^2,
-         sqft_living_sq = sqft_living^2,
-         # Extended additional variables
-         floors_sq = floors^2,
-         grade_sq = grade^2)
-
 # Fit the new model with squared terms
-model_log_price_sq <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built + yr_built_sq + sqft_living_sq, data = kc_house_data)
+model_log_price_sq <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built + I(yr_built^2) + I(sqft_living^2), data = kc_house_data)
 
 summary(model_log_price_sq)
 ```
@@ -839,7 +837,7 @@ test_set <- kc_house_data[-training_indices, ]
 
 model_log_price_train <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built, data = training_set)
 
-model_log_price_sq_train <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built + yr_built_sq + sqft_living_sq, data = training_set)
+model_log_price_sq_train <- lm(log_price ~ bedrooms + bathrooms + sqft_living + floors + view + condition + grade + yr_built + I(yr_built^2) + I(sqft_living^2), data = training_set)
 
 pred_log_price <- predict(model_log_price_train, newdata = test_set)
 
@@ -855,7 +853,7 @@ summary(model_log_price_sq_train)
 
 # Extention
 
-model_log_price_new <- lm(log_price ~ bedrooms +  bedrooms : bathrooms  +  bathrooms : grade + sqft_living +sqft_living:floors + grade + floors  + condition + yr_built + yr_built_sq + sqft_living_sq +view + view:bathrooms  + floors_sq +grade_sq, data = training_set)
+model_log_price_new <- lm(log_price ~ bedrooms +  bedrooms : bathrooms  +  bathrooms : grade + sqft_living +sqft_living:floors + grade + floors  + condition + yr_built + I(yr_built^2) + I(sqft_living^2) +view + view:bathrooms  + I(floors^2) +I(grade^2), data = training_set)
 
 pred_log_price_new <- predict(model_log_price_new, newdata = test_set)
 
@@ -1012,10 +1010,172 @@ ggplot(comparison_df_tidy, aes(x = Variable, y = Coefficient, fill = Model)) +
 
 glm() by default standardizes the data. The importance of standardization in regularized models are thoroughly examined in the exercise before. Here in Ridge Regression, the coefficients are generally smaller, indicating that the regularization term λ is effectively shrinking them. This often results in a model that generalizes better to new data by mitigating multicollinearity and reducing overfitting.
 
+4-) The value 70 for λ is arbitrary and we would like to find a data-driven way to choose it. The criterion to compare is the mean squared prediction error as in exercise 4 (d) on linear regression. Split the data randomly into a training and a test set with set.seed(1122).
 
 ```{r empty}
 
+set.seed(1122)
+
+train = Hitters %>%
+  sample_frac(0.8)
+
+test = Hitters %>%
+  setdiff(train)
+
+x_train = model.matrix(Salary~., train)[,-1]
+x_test = model.matrix(Salary~., test)[,-1]
+
+y_train = train %>%
+  select(Salary) %>%
+  unlist() %>%
+  as.numeric()
+
+y_test = test %>%
+  select(Salary) %>%
+  unlist() %>%
+  as.numeric()
+
+cv.out = cv.glmnet(x_train, y_train, alpha = 0) # Fit ridge regression model on training data
+bestlam = cv.out$lambda.min  # Select lamda that minimizes training MSE
+bestlam
+
+plot(cv.out)
+
+# What is the test MSE associated with this value of  λ?
+ridge_model.best.l <- glmnet(x_train, y_train, alpha=0, lambda = bestlam)
+ridge_pred = predict(ridge_model.best.l, s = bestlam, newx = x_test) # Use best lambda to predict test data
+mean((ridge_pred - y_test)^2)
 ```
+
+I think the best way to perform this task would be to use the built-in cross-validation function, cv.glmnet(). By default, the function performs 10-fold cross-validation.
+
+5-) Write a function that takes λ as argument, fits a ridge regression on the training sets and calculates the mean squared prediction error on the test set. Run this function on a logarithmic grid (e.g., 10^seq(from = 10, to = -2, length = 100)). Plot the results against log(λ) and graphically find the value λopt that minimises the mean squared prediction error.
+
+```{r}
+ridge_mse <- function(lambda, x_train, y_train, x_test, y_test) {
+  ridge_mod <- glmnet(x_train, y_train, alpha = 0, lambda = lambda)
+  y_pred <- predict(ridge_mod, s = lambda, newx = x_test)
+  mse <- mean((y_test - y_pred)^2)
+  return(mse)
+}
+
+# Grid of lambda values
+lambda_grid <- 10^seq(10, -2, length = 100)
+
+# Calculate MSE for each lambda
+mse_values <- sapply(lambda_grid, ridge_mse, x_train = x_train, y_train = y_train, x_test = x_test, y_test = y_test)
+
+# Find the optimal lambda that minimizes MSE
+optimal_lambda <- lambda_grid[which.min(mse_values)]
+optimal_mse <- min(mse_values)
+
+# Plot the results
+plot_data <- data.frame(
+  log_lambda = log(lambda_grid),
+  mse = mse_values
+)
+
+ggplot(plot_data, aes(x = log_lambda, y = mse)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept = log(optimal_lambda), linetype = "dashed", color = "red") +
+  annotate("text", x = log(optimal_lambda), y = optimal_mse, label = paste0("lambda: ", round(optimal_lambda, 2), "\nMSE: ", round(optimal_mse, 2)), hjust = -0.1, vjust = -1.5, color = "red") +
+  labs(title = "MSE vs. log(lambda)",
+       x = "log(lambda)",
+       y = "Mean Squared Error") +
+  theme_minimal()
+
+# Print the optimal lambda value
+cat("The optimal lambda value is:", optimal_lambda, "\n")
+
+```
+
+6-)  Fit a ridge regression with λopt on all the data, and interpret some of the coefficients. Which are the most important variables? Are there coefficients that equal zero exactly?
+
+```{r}
+
+# Fit a ridge regression with optimal lambda on all the data
+ridge_model_optimal <- glmnet(x, y, alpha = 0, lambda = optimal_lambda)
+optimal_ridge_coefficients <- as.vector(coef(ridge_model_optimal))
+names(optimal_ridge_coefficients) <- rownames(coef(ridge_model_optimal))
+
+print("Ridge Regression Coefficients with optimal lambda:")
+
+important_variables <- sort(abs(optimal_ridge_coefficients), decreasing = TRUE)
+important_variables
+
+
+```
+Intercept and DivisionW are pretty important in ridge regression. There are not any coefficients that are set to 0.
+
+
+7-) Repeat parts (d), (e) and (f) for lasso instead of ridge. Are there now coefficients that are equal to zero?
+
+
+```{r}
+
+# Fit lasso regression model with cross-validation
+cv.out_lasso <- cv.glmnet(x_train, y_train, alpha = 1)
+bestlam_lasso <- cv.out_lasso$lambda.min
+
+# Plot cross-validation results
+plot(cv.out_lasso)
+
+# Calculate the test MSE associated with the best lambda for lasso
+lasso_model_best <- glmnet(x_train, y_train, alpha = 1, lambda = bestlam_lasso)
+lasso_pred <- predict(lasso_model_best, s = bestlam_lasso, newx = x_test)
+test_mse_lasso <- mean((lasso_pred - y_test)^2)
+cat("The test MSE associated with the best CV lambda for lasso is:", test_mse_lasso, "\n")
+
+# Define the function to calculate MSE
+lasso_mse <- function(lambda, x_train, y_train, x_test, y_test) {
+  lasso_mod <- glmnet(x_train, y_train, alpha = 1, lambda = lambda)
+  y_pred <- predict(lasso_mod, s = lambda, newx = x_test)
+  mse <- mean((y_test - y_pred)^2)
+  return(mse)
+}
+
+# Grid of lambda values
+lambda_grid_lasso <- 10^seq(10, -2, length = 100)
+
+# Calculate MSE for each lambda
+mse_values_lasso <- sapply(lambda_grid_lasso, lasso_mse, x_train = x_train, y_train = y_train, x_test = x_test, y_test = y_test)
+
+# Find the optimal lambda that minimizes MSE
+optimal_lambda_lasso <- lambda_grid_lasso[which.min(mse_values_lasso)]
+optimal_mse_lasso <- min(mse_values_lasso)
+
+# Plot the results
+plot_data_lasso <- data.frame(
+  log_lambda = log(lambda_grid_lasso),
+  mse = mse_values_lasso
+)
+
+ggplot(plot_data_lasso, aes(x = log_lambda, y = mse)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept = log(optimal_lambda_lasso), linetype = "dashed", color = "red") +
+  annotate("text", x = log(optimal_lambda_lasso), y = optimal_mse_lasso, label = paste0("lambda: ", round(optimal_lambda_lasso, 2), "\nMSE: ", round(optimal_mse_lasso, 2)), hjust = -0.1, vjust = -1.5, color = "red") +
+  labs(title = "MSE vs. log(lambda) for Lasso",
+       x = "log(lambda)",
+       y = "Mean Squared Error") +
+  theme_minimal()
+
+cat("The optimal lambda value for lasso is:", optimal_lambda_lasso, "\n")
+
+
+# Fit a lasso regression with optimal lambda on all the data
+lasso_model_optimal <- glmnet(x, y, alpha = 1, lambda = optimal_lambda_lasso)
+optimal_lasso_coefficients <- as.vector(coef(lasso_model_optimal))
+names(optimal_lasso_coefficients) <- rownames(coef(lasso_model_optimal))
+
+important_lasso_variables <- sort(abs(optimal_lasso_coefficients), decreasing = TRUE)
+important_lasso_variables
+
+
+```
+
+The difference between ridge and lasso regression is that Lasso tends to make coefficients to absolute zero as compared to Ridge which never sets the value of coefficient to absolute zero. Therefore, Lasso puts more weights on individual coefficients. Intercept, Hits, Walks, CRBI and CRuns are all non zero in Lasso regression. 
 
 
 References
