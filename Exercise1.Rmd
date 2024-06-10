@@ -27,9 +27,11 @@ Go to UCI Machine learning repository and download the data on the white wine qu
 1. Read the data into R. Add to the data frame a new binary variable good which is 1 if quality \> 5 and 0 otherwise. We would like to compare volatile.acidity and residual.sugar for good and bad wines.
 
 ```{r a, warning=FALSE, message=FALSE}
+# install.packages('jmuOutlier')
 library(tidyverse)
 library(here)
 library(ggplot2)
+library(jmuOutlier)
 library(ISLR)
 library(glmnet)
 
@@ -478,8 +480,6 @@ The median is a solution for both cases when N is an odd or even number. However
 2- Generate n = 20 independent realisations of X with µ = 1 and σ = 1. Determine the maximum likelihood estimator of µ based on this sample using R function quantile. Function quantile has 9 types of sample quantiles. Experiment with the different types of quantiles that are most suitable for the data (justify). Are there any differences? Increase now the sample to n = 1000 and compare different median estimators. Comment on the result.
 
 ```{r laplace.quantile}
-# install.packages('jmuOutlier')
-library(jmuOutlier)
 set.seed(123)
 
 # Set parameters
@@ -524,47 +524,17 @@ laplace_data <- laplace.data.20
 optimise(laplace.log.likelihood,maximum = T,
          lower = 0, upper = 10)
 
-
-
-laplace_data <- laplace.data.1000
-
-# Newton-Raphson
-niter <- 100
-# xk Initial values
-laplace.log.likelihood.newton <- function(xk){
-  h <- 0.01
-  for(k in 1:niter){
-    Q <- (h/2) * ((laplace.log.likelihood(xk + h) - laplace.log.likelihood(xk - h))/
-                    (laplace.log.likelihood(xk + h) - 2*laplace.log.likelihood(xk) + laplace.log.likelihood(xk - h)))
-    xnew <- xk - Q
-    print(xnew)
-    xk <- xnew
-  }
-}
-
-laplace.log.likelihood.newton(0.21)
-
-
-laplace_data <- laplace.data.20
-laplace.log.likelihood.newton(0.21)
-
 ```
 
 According to the [documentation](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/optimize), optimise() method uses somewhat a combination of golden section search and successive parabolic interpolation. The algorithm starts with an initial interval and evaluates the function at two points within this interval. The points are chosen according to the golden section ratio $φ = (1 + √5) / 2$, which ensures that the interval contracts efficiently.  After the initial evaluations, the algorithm performs successive parabolic interpolations to refine the location of the maximum. This technique utilizes information from previous function evaluations to approximate the maximum more accurately. We get very close optimum results with the corresponding data.
-Check out this informative video on YouTube: [YouTube Video](https://www.youtube.com/watch?v=8z4I348eayg).
-
 
 Newton-Raphson method:
 \[x_{k+1} = x_k - Q_k\]
 \[Q_k = \frac{f'(x_k)}{f''(x_k)}\]
 
-The method tends to converge if the following condition holds true:
-\[|f(x)f''(x)| < |f'(x)|^2\]
+The problem with our function here is that, when we want to maximize the log likelihood, the second derivative of the function is not defined at the parameter µ and is 0 at other values. This makes the update step infinitely large so it is not possible to use Newton's Method here.
 
-Using the central difference approximation for the derivative:
-\[Q_k = \frac{h}{2} \left[ \frac{f(x + h) - f(x - h)}{f(x + h) - 2f(x) + f(x - h)} \right]\]
-
-For a small sample size like n=20, even though the log-likelihood function tries to smooth out, it can be highly irregular due to the limited data. This irregularity can cause the Newton-Raphson method (or even optimise) to perform poorly. Both performs well with the sample size 1000 however, newton-raphson does not converge.
+optimise() function performs better in both sample sizes because the result is closer to 1. 
 
 4-) Let us now study the distribution of the maximum likelihood estimator. For this, calculate M = 5000 maximum likelihood estimators of µ based on the sample of n = 20 random variables generated from the Laplace distribution with µ = 1 and σ = 1. Repeat the same for the sample size n = 1000. Use histograms and QQ-plots to check if both Monte Carlo samples follow a normal distribution. Compare variances of both distributions, comment on the results.
 
@@ -575,26 +545,6 @@ find_mle_laplace <- function(x) {
   return(result$maximum)
 }
 
-# Newton-Raphson method
-laplace.log.likelihood.newton <- function(xk){
-  h <- 0.01
-  tol = 1e-6
-  for(k in 1:niter){
-    Q <- (h/2) * ((laplace.log.likelihood(xk + h) - laplace.log.likelihood(xk - h))/
-                    (laplace.log.likelihood(xk + h) - 2*laplace.log.likelihood(xk) + laplace.log.likelihood(xk - h)))
-    xnew <- xk - Q
-    
-    if(is.na(xnew)){
-      return("No Convergence")
-    }
-    
-    if (abs(xnew - xk) < tol) {
-      return(xnew)  # Convergence check
-    }
-    xk <- xnew
-  }
-  return(xk)
-}
 
 # Parameters
 mu <- 1
@@ -605,7 +555,6 @@ M <- 5000
 # Storage for results
 results_optimise <- numeric(M)
 results_quantile <- numeric(M)
-results_newton <- numeric(M)
 
 for (i in 1:M) {
   laplace_data <- rlaplace(n, mu, sigma)
@@ -618,9 +567,6 @@ for (i in 1:M) {
   optimise_result <- find_mle_laplace(laplace_data)
   results_optimise[i] <- optimise_result
   
-  # MLE using Newton-Raphson
-  newton_result <- laplace.log.likelihood.newton(0.21)
-  results_newton[i] <- newton_result
 }
 
 # Display results
@@ -628,7 +574,7 @@ cat("First 5 results using optimise:\n", head(results_optimise, 5), "\n")
 cat("First 5 results using quantile:\n", head(results_quantile, 5), "\n")
 
 # Plot histograms and QQ-plots
-par(mfrow = c(3, 2))
+par(mfrow = c(2, 2))
 hist(results_optimise, main = "Histogram of MLEs (optimise) for n = 20", xlab = "MLE of mu", breaks = 50)
 qqnorm(results_optimise, main = "QQ-plot of MLEs (optimise) for n = 20")
 qqline(results_optimise)
@@ -657,26 +603,15 @@ for (i in 1:M) {
   # MLE using optimise
   optimise_result <- find_mle_laplace(laplace_data)
   results_optimise[i] <- optimise_result
-  
-  # MLE using Newton-Raphson
-  newton_result <- laplace.log.likelihood.newton(0.3)
-  results_newton[i] <- newton_result
 
 }
-results_newton <- subset(results_newton, as.numeric(results_newton) >= -10 &
-                          as.numeric(results_newton) <= 10)
-
-
-results_newton <- as.numeric(results_newton)
-
 
 # Display results
 cat("First 5 results using optimise:\n", head(results_optimise, 5), "\n")
 cat("First 5 results using quantile:\n", head(results_quantile, 5), "\n")
-cat("First 5 results using Newton-Raphson:\n", head(results_newton, 5), "\n")
 
 # Plot histograms and QQ-plots
-par(mfrow = c(3, 2))
+par(mfrow = c(2, 2))
 hist(results_optimise, main = "Histogram of MLEs (optimise) for n = 1000", xlab = "MLE of mu", breaks = 50)
 qqnorm(results_optimise, main = "QQ-plot of MLEs (optimise) for n = 1000")
 qqline(results_optimise)
@@ -685,19 +620,16 @@ hist(results_quantile, main = "Histogram of MLEs (quantile) for n = 1000", xlab 
 qqnorm(results_quantile, main = "QQ-plot of MLEs (quantile) for n = 1000")
 qqline(results_quantile)
 
-hist(results_newton, main = "Histogram of MLEs (Newton-Raphson) for n = 1000", xlab = "MLE of mu", breaks = 50)
-qqnorm(results_newton, main = "QQ-plot of MLEs (Newton-Raphson) for n = 1000")
-qqline(results_newton)
 
 # Variance comparison
 variance_optimise <- var(results_optimise)
 variance_quantile <- var(results_quantile)
-variance_newton <- var(results_newton)
 
 cat("Variance of MLEs using optimise for n = 1000:", variance_optimise, "\n")
 cat("Variance of MLEs using quantile for n = 1000:", variance_quantile, "\n")
-cat("Variance of MLEs using Newton-Raphson for n = 1000:", variance_newton, "\n")
 ```
+The variances are very close to each other, showing that both methods provide similar variability in the estimates for the larger sample size. As the sample size increases, the distribution of the MLEs tends to approximate the normal distribution more closely, which is consistent with the Central Limit Theorem. The variance of the MLEs decreases significantly as the sample size increases from 20 to 1000. This is expected since larger sample sizes provide more information about the population parameter, leading to more precise estimates.
+
 
 ## Linear Regression
 
@@ -1176,6 +1108,66 @@ important_lasso_variables
 ```
 
 The difference between ridge and lasso regression is that Lasso tends to make coefficients to absolute zero as compared to Ridge which never sets the value of coefficient to absolute zero. Therefore, Lasso puts more weights on individual coefficients. Intercept, Hits, Walks, CRBI and CRuns are all non zero in Lasso regression. 
+
+
+## Logistic regression
+
+#### Dataset
+Go to UCI Machine learning repository and download the data on blood donation. This page contains also the background information on the data. The goal is to build a model that allows to
+predict best if a donor will donate blood. The dataset contains the following variables:
+
+-   recency: months since last donation
+-   frequency: total number of donations
+-   amount: total blood donated in c.c.
+-   time: months since first donation
+-   donation: 1 stands for donating blood, 0 stands for not donating blood
+
+#### Exercises
+
+1-) Read the data into R and
+fit a generalised linear model with the binary response donation and covariate frequency using the canonical link function. Fit the same model replacing the covariate by amount. Compare it to the first model. Plot the variable frequency against amount. Comment on the results. Do you need both of these variables in the model?
+
+
+```{r}
+# Read the data into R
+transfusion <- read.csv("transfusion.data", col.names = c("recency", "frequency", "amount", "time", "donation"))
+
+# Fit a GLM with donation as the response and frequency as the predictor
+model_frequency <- glm(donation ~ frequency, data = transfusion, family = binomial(link = "logit"))
+
+# Summary of the model
+summary(model_frequency)
+
+# Fit a GLM with donation as the response and amount as the predictor
+model_amount <- glm(donation ~ amount, data = transfusion, family = binomial(link = "logit"))
+
+# Summary of the model
+summary(model_amount)
+
+# Compare the two models using AIC
+aic_frequency <- AIC(model_frequency)
+aic_amount <- AIC(model_amount)
+
+cat("AIC for model with frequency as predictor:", aic_frequency, "\n")
+cat("AIC for model with amount as predictor:", aic_amount, "\n")
+
+# Plot frequency against amount
+plot(transfusion$frequency, transfusion$amount,
+     xlab = "Frequency",
+     ylab = "Amount",
+     main = "Frequency vs Amount",
+     pch = 19,
+     col = "blue")
+
+# Check correlation between frequency and amount
+correlation <- cor(transfusion$frequency, transfusion$amount)
+cat("Correlation between frequency and amount:", correlation, "\n")
+
+```
+
+The correlation of 1 between frequency and amount indicates perfect collinearity, meaning that these two variables provide the same information. In this case, including both variables in the model is redundant, and it would be appropriate to use only one of them.
+
+Since the AIC values for the models with frequency and amount as predictors are the same, it confirms that both predictors contribute equally to the model. Given this perfect collinearity, we only need one of these variables in our model.
 
 
 References
