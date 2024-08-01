@@ -38,6 +38,8 @@ library(JoSAE)
 library(lme4)
 library(nlme)
 library(astsa)
+library(maps)
+library(mapdata)
 
 white.wine.quality <- read.csv("winequality-white.csv", sep = ";")
 white.wine.quality <- white.wine.quality %>% select(volatile.acidity, residual.sugar, 
@@ -1578,14 +1580,63 @@ results_corn <- calculate_predictors_mse(landsat, params_corn, "PixelsCorn", "Me
 results_soy <- calculate_predictors_mse(landsat, params_soy, "PixelsSoybeans", "MeanPixelsSoybeans", "HASoybeans")
 
 # Combine results for output
-list(corn = results_corn, soybeans = results_soy)
-
+results <- list(corn = results_corn, soybeans = results_soy)
+results
 
 ```
 
 
-4-)
+4-) d) Estimate the total county field size for both crops and plot the results by the BLUP from part (c) as well as the predictor only relying on the survey data in a table and onto a map of Iowa. You may use the packages ggplot2 for plotting and maps and mapdata for modelling the data frame. Comment on the results.
 
+```{r}
+iowa_map <- map_data("county", region = "iowa")
+
+
+iowa_map <- iowa_map %>%
+  rename(CountyName = subregion)
+
+
+results$corn$CountyName <- tolower(results$corn$CountyName)
+results$soybeans$CountyName <- tolower(results$soybeans$CountyName)
+
+corn.blup.y <- results$corn %>%
+  rename(mu_gamma_corn = mu_gamma, mu_bar_y_corn = mu_bar_y) %>% select(CountyName, mu_gamma_corn, mu_bar_y_corn)
+
+soybeans.blup.y <- results$soybeans %>%
+  rename(mu_gamma_soybeans = mu_gamma, mu_bar_y_soybeans = mu_bar_y) %>% select(CountyName, mu_gamma_soybeans, mu_bar_y_soybeans)
+
+
+map_data <- left_join(iowa_map, corn.blup.y, by = c("CountyName"))
+map_data <- left_join(map_data, soybeans.blup.y, by = c("CountyName"))
+
+
+ggplot(map_data, aes(x = long, y = lat,group = group, fill = mu_gamma_soybeans)) +
+  geom_polygon(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue", na.value = "grey50") +
+  labs(fill = "BLUP", title = "BLUP of Soybeans Fields by County in Iowa")+
+  theme_minimal()
+
+ggplot(map_data, aes(x = long, y = lat,group = group, fill = mu_gamma_corn)) +
+  geom_polygon(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue", na.value = "grey50") +
+  labs(fill = "BLUP", title = "BLUP of Corn Fields by County in Iowa")+
+  theme_minimal()
+
+ggplot(map_data, aes(x = long, y = lat,group = group, fill = mu_bar_y_soybeans)) +
+  geom_polygon(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue", na.value = "grey50") +
+  labs(fill = "Hectars", title = "Hectars of Soybeans in Iowa")+
+  theme_minimal()
+
+ggplot(map_data, aes(x = long, y = lat,group = group, fill = mu_bar_y_corn)) +
+  geom_polygon(color = "black") +
+  scale_fill_gradient(low = "white", high = "blue", na.value = "grey50") +
+  labs(fill = "Hectars", title = "Hectars of Corn in Iowa")+
+  theme_minimal()
+
+```
+
+There seems to be a very high negative correlation between soybeans and corns! 
 
 ## Principal component analysis
 
