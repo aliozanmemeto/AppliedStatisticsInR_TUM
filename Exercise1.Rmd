@@ -27,13 +27,17 @@ Go to UCI Machine learning repository and download the data on the white wine qu
 1. Read the data into R. Add to the data frame a new binary variable good which is 1 if quality \> 5 and 0 otherwise. We would like to compare volatile.acidity and residual.sugar for good and bad wines.
 
 ```{r a, warning=FALSE, message=FALSE}
-# install.packages('jmuOutlier')
 library(tidyverse)
 library(here)
 library(ggplot2)
 library(jmuOutlier)
 library(ISLR)
 library(glmnet)
+library(faraway)
+library(JoSAE)
+library(lme4)
+library(nlme)
+library(astsa)
 
 white.wine.quality <- read.csv("winequality-white.csv", sep = ";")
 white.wine.quality <- white.wine.quality %>% select(volatile.acidity, residual.sugar, 
@@ -122,7 +126,7 @@ Despite the presence of the outlier, we can observe that the mean residual sugar
 +   Generate boxplots for both samples, placing them into one graphic. What do you observe?
 ```{r boxplot}
 
-p <- ggplot(white.wine.quality, aes(good, residual.sugar))
+p <- ggplot(white.wine.quality, aes(factor(good, levels = c(FALSE, TRUE), labels = c("Bad", "Good")), residual.sugar))
 p + geom_boxplot()
 
 ```
@@ -133,7 +137,7 @@ We can support the pattern we encountered in the previous question. It is highly
 
 ```{r qqplot}
 
-qqplot(bad.wine$residual.sugar,good.wine$residual.sugar, main = "QQ-plot: Good vs Bad Wines",
+qqplot(good.wine$residual.sugar, bad.wine$residual.sugar, main = "QQ-plot: Good vs Bad Wines",
        xlab = "Residual Sugar - Good Wines", ylab = "Residual Sugar - Bad Wines")
 abline(0, 1, col = "red")  # Add y = x line
 ```
@@ -1170,8 +1174,685 @@ The correlation of 1 between frequency and amount indicates perfect collinearity
 Since the AIC values for the models with frequency and amount as predictors are the same, it confirms that both predictors contribute equally to the model. Given this perfect collinearity, we only need one of these variables in our model.
 
 
+2-) Fit now the GLM model with the response donation and covariate recency using all link functions available in the glm function. Compare obtained estimators and comment on the
+differences.
+
+```{r}
+fit_logit <- glm(donation ~ recency, data = transfusion, family = binomial(link = "logit"))
+fit_probit <- glm(donation ~ recency, data = transfusion, family = binomial(link = "probit"))
+fit_cauchit <- glm(donation ~ recency, data = transfusion, family = binomial(link = "cauchit"))
+fit_log <- glm(donation ~ recency, data = transfusion, family = binomial(link = "log"))
+fit_cloglog <- glm(donation ~ recency, data = transfusion, family = binomial(link = "cloglog"))
+
+
+summary(fit_logit)
+summary(fit_probit)
+summary(fit_cauchit)
+summary(fit_log)
+summary(fit_cloglog)
+
+```
+
+According to the documentation of ?glm(), "...the binomial family the links logit, probit, cauchit, (corresponding to logistic, normal and Cauchy CDFs respectively) log and cloglog (complementary log-log)".
+
+The comparison of GLM models using different link functions (logit, probit, cauchit, log, and cloglog) reveals distinct differences in their coefficient estimates and model fit. The logit and probit models, which are often similar, both show significant coefficients for recency, with the logit model having slightly larger coefficients. The cauchit model, based on the Cauchy distribution, exhibits more extreme coefficient values and a higher AIC, indicating a less favorable fit compared to logit and probit. The log model provides a different scale for the intercept and slightly smaller coefficients for recency, with an AIC comparable to the logit model.
+
+The complementary log-log (cloglog) model shows the lowest AIC, suggesting the best fit among the models tested. Despite these variations, all models consistently indicate that recency is a significant predictor of donation.
+
+3-) Now we would like to build a model that makes the best prediction for the blood donations.
+-   First divide the dataset into a training and a test set. Sample randomly 374 rows to include into the training set and the rest will be the test set. To ensure comparability of the results set.seed(1122) before sampling. Fit a GLM model with the response donation and canonical link on the training set, choosing appropriate covariates. Predict the model
+on the test set.
+
+```{r}
+set.seed(1122)
+
+# Randomly sample 374 rows for the training set
+train_indices <- sample(1:nrow(transfusion), 374)
+train_set <- transfusion[train_indices, ]
+test_set <- transfusion[-train_indices, ]
+
+# Fit a GLM model with the canonical link (logit) on the training set
+glm_model <- glm(donation ~ recency + frequency + time, data = train_set, family = binomial(link = "logit"))
+
+# Predict the model on the test set
+test_set$predicted_prob <- predict(glm_model, newdata = test_set, type = "response")
+
+# Print the summary of the fitted model
+summary(glm_model)
+
+```
+
+The canonical link function for the binomial distribution in generalized linear models (GLMs) is the *logit* function. 
+
+
+
+-   With the predicted probability perform the classification: set the predicted ith value of donation to 0, if the corresponding ith predicted probability is less than 0.5 and to 1 otherwise. Assess the goodness of your classification calculating the mean absolute error.  Try to extend the model to improve the classification error. Can you beat a performance of 0.2085561?
+
+```{r}
+train_set$log_amount <- log(train_set$amount + 1)
+train_set$amount_t <- train_set$amount / train_set$time
+train_set$r_a <- train_set$amount * train_set$recency
+
+test_set$log_amount <- log(test_set$amount + 1)
+test_set$amount_t <- test_set$amount / test_set$time
+test_set$r_a <- test_set$amount * test_set$recency
+
+glm_model_extended <- glm(donation ~ recency  + time + log_amount + r_a, data = train_set, family = binomial(link = "logit"))
+
+summary(glm_model_extended)
+
+test_set$predicted_prob_extended <- predict(glm_model_extended, newdata = test_set, type = "response")
+
+
+test_set$predicted_class <- ifelse(test_set$predicted_prob < 0.5, 0, 1)
+
+test_set$predicted_class_extended <- ifelse(test_set$predicted_prob_extended < 0.5, 0, 1)
+
+mean(abs(test_set$donation - test_set$predicted_class))
+mean(abs(test_set$donation - test_set$predicted_class_extended))
+
+```
+
+
+## Generalized linear models
+
+
+#### Dataset
+The dataset student-mat.csv can be found on Kaggle. This page contains a full description of the data and all the variables. Variables G1, G2, and G3 are first, second, and final grades in
+mathematics. The remaining variables are explanatory variables. We would like to identify variables that explain grades in mathematics.
+
+1-) First we need to identify the distribution of each of G1, G2, and G3. Can each of these variables be assumed to follow a normal distribution? Justify your answer using suitable arguments and graphical tools. Can each of G1, G2, and G3 be assumed to follow a Poisson distribution?
+Are there signs for over-dispersion or any other anomalies in the distributions of any of G1, G2, or G3? Support your answer using suitable arguments and graphical tools.
+
+```{r, warning=FALSE}
+student.mat <- read.csv("student-mat.csv")
+
+head(student.mat)
+
+summary(student.mat[, c("G1", "G2", "G3")])
+
+
+# Normality Assessment
+# Plot histograms
+hist(student.mat$G1, breaks = 10, main = "Histogram of G1", xlab = "G1")
+hist(student.mat$G2, breaks = 10, main = "Histogram of G2", xlab = "G2")
+hist(student.mat$G3, breaks = 10, main = "Histogram of G3", xlab = "G3")
+
+# Plot Q-Q plots
+qqnorm(student.mat$G1, main = "Q-Q Plot of G1")
+qqline(student.mat$G1)
+qqnorm(student.mat$G2, main = "Q-Q Plot of G2")
+qqline(student.mat$G2)
+qqnorm(student.mat$G3, main = "Q-Q Plot of G3")
+qqline(student.mat$G3)
+
+
+
+dispersion.test.poisson <- function(data) 
+{
+  obs_freq <- table(data)
+
+  lambda <- mean(data)
+  exp_freq <- dpois(as.numeric(names(obs_freq)), lambda) * length(data)
+  
+  chisq_test <- chisq.test(obs_freq, p = exp_freq, rescale.p = TRUE)
+  print(chisq_test)
+  
+  qqplot(qpois(ppoints(length(data)), lambda), data,
+         main = "QQ Plot for Poisson Distribution",
+         xlab = "Theoretical Quantiles",
+         ylab = "Sample Quantiles")
+  abline(0, 1, col = "red")
+}
+
+
+cat("G1 Poisson: ", dispersion.test.poisson(student.mat$G1))
+cat("G2 Poisson: ", dispersion.test.poisson(student.mat$G2))
+cat("G3 Poisson: ", dispersion.test.poisson(student.mat$G3))
+
+```
+
+Distributions are not normal. They highly deviate from the normal distribution. Looking at the distributions, we can make the assumptions that G1 might be underdispersed, G2 and G3 might be overdispersed looking at the QQ plots. Dispersion parameter above 1 also supports that. We can try a Chi-squared Goodness-of-fit test, A p-value greater than 0.05 typically suggests that the data does not significantly deviate from a Poisson distribution, in hypothesis testing lingo, we cannot conclude that the data do not follow a poisson distribution. Looking at the results G1 seems to be the closest to poisson distribution but it is still not significant.
+
+2-) Fit a suitable (generalised) linear model to explain G1 including all explanatory variables (Model 1). Are all covariates significant? Comment on the goodness-of-fit of this model. Calculate the Pearson residuals and Anscombe residuals and assess how closely they follow a normal distribution. Pursue the residual analysis and comment if the fitted (generalised) linear model is adequate for the data.
+
+
+```{r}
+model_G1 <- glm(G1 ~ .-G2-G3, data = student.mat, family = poisson)
+summary(model_G1)
+
+predicted_G1 <- fitted(model_G1)
+
+#  for Poisson regression var(predicted_G1) = predicted_G1
+pearson_residuals_G1 <- (student.mat$G1 - predicted_G1) / sqrt(predicted_G1)
+
+anscombe_residuals_G1 <- (3/2) * (student.mat$G1^(2/3) * predicted_G1^(-(1/6)) - predicted_G1^(1/2))
+
+hist(pearson_residuals_G1, main = "Pearson Residuals for G1", xlab = "Pearson Residuals", probability = TRUE)
+qqnorm(pearson_residuals_G1, main = "Q-Q Plot of Pearson Residuals for G1")
+qqline(pearson_residuals_G1)
+
+hist(anscombe_residuals_G1, main = "Anscombe Residuals for G1", xlab = "Anscombe Residuals", probability = TRUE)
+qqnorm(anscombe_residuals_G1, main = "Q-Q Plot of Anscombe Residuals for G1")
+qqline(anscombe_residuals_G1)
+
+# Calculate residuals and fitted values for G1
+residuals_G1 <- residuals(model_G1)
+
+# Half-normal plot and residuals vs. fitted values plot for G1
+par(mfrow = c(1, 2), mar = c(5, 5, 1, 1))
+
+# Half-normal plot of sorted residuals for G1
+halfnorm(residuals_G1, ylab = "Sorted Residuals for G1")
+
+# Residuals vs. fitted values plot (log scale) for G1
+plot(log(predicted_G1), log((student.mat$G1 - predicted_G1)^2), 
+     xlab = expression(hat(y)), ylab = expression((y - hat(y))^2),
+     main = "Log Squared Residuals vs. Log Fitted Values")
+abline(0, 1)
+
+# Residual analysis anscombe
+par(mfrow = c(1, 2), mar = c(5, 5, 1, 1))
+
+# Half-normal plot of sorted Anscombe residuals
+halfnorm(anscombe_residuals_G1, ylab = "Sorted Anscombe Residuals for G1")
+
+# Residuals vs. fitted values plot (log scale) for Anscombe residuals
+plot(log(predicted_G1), log(anscombe_residuals_G1^2), 
+     xlab = expression(hat(y)), ylab = expression((y - hat(y))^2),
+     main = "Log Squared Anscombe Residuals vs. Log Fitted Values")
+abline(0, 1)
+
+# Anscombe residual analysis
+halfnorm(anscombe_residuals_G1, ylab = "Sorted Anscombe Residuals for G1")
+
+plot(log(predicted_G1), log(anscombe_residuals_G1^2), 
+     xlab = expression(hat(y)), ylab = expression((y - hat(y))^2),
+     main = "Log Squared Anscombe Residuals vs. Log Fitted Values")
+abline(0, 1)
+
+
+# Dispersion
+sum(residuals(model_G1,type="pearson")^2)/model_G1$df.res
+
+
+```
+
+Only the intercept, sexM, studytime, failures, schoolsupyes, famsupyes and goout seem to be significant. Dispersion can be considered as the goodness of fit of the model. As we expected, it is underdispersed with the dispersion value 0.7303499 < 1.
+
+According to the book [2], "A disadvantage of the Pearson residual is that the distribution of pearson residual for non-Normal distributions is often markedly skewed, and so  it may fail to have properties similar to those of a Normal-theory residual. Anscombe proposed defining a residual using a function A(y) in place of y, where A(.) is chosen to make the distribution of A(Y) "as Normal as possible'. When we look at both residuals, they do not follow a normal distribution. They are less dispersed than a normal distribution. 
+
+Residual analysis shows a very similar result. Most of the values are below the line and there are certainly some outliers.
+
+
+
+3-) Take Model 1, but reduce the covariates to sex, Fedu, studytime, failures, schoolsup, famsup, goout (Model 2). Are all the covariates significant? Interpret the effect of each covariate on the grade. Assess the goodness-of-fit of this model. Perform analysis of deviance test to compare Model 1 and Model 2. Comment on the results. In Model 2 replace goout by Walc to get Model 3. How one can compare Model 2 and Model 3? Which model delivers a better fit? Justify your answer.
+
+
+```{r}
+compute_deviance <- function(model) {
+  y <- model$y
+  mu <- fitted(model)
+  deviance <- 2 * sum(y * log(y / mu) - (y - mu))
+  return(deviance)
+}
+
+model2_G1 <- glm(G1 ~ sex + Fedu + studytime + failures + schoolsup + famsup + goout, 
+                        data = student.mat, family = poisson)
+
+summary(model2_G1)
+
+deviance_full <- compute_deviance(model_G1)
+deviance_m2 <- compute_deviance(model2_G1)
+
+delta_D <- deviance_m2 - deviance_full
+
+df <- length(coef(model_G1)) - length(coef(model2_G1))
+
+# Critical value at 5% significance level
+critical.value <- qchisq(0.95, df)
+
+ifelse(delta_D > critical.value, "Reject reduced model, full model is better", "Fail to reject reduced model")
+
+#Model 3
+model3_G1 <- glm(G1 ~ sex + Fedu + studytime + failures + schoolsup + famsup + Walc, 
+                        data = student.mat, family = poisson)
+
+deviance_m3 <- compute_deviance(model3_G1)
+
+delta_D.2 <- deviance_m3 - deviance_m2
+df.2 <- length(coef(model2_G1)) - length(coef(model3_G1))
+
+critical.value.2 <- qchisq(0.95, df.2)
+
+ifelse(delta_D.2 > critical.value.2, "Reject model 3, model 2 is better", "Fail to reject reduced model")
+
+```
+
+
+All covariates are significant at various levels, indicating they all contribute to the model2_G1 at the significance p < 0.05. A lower deviance and AIC compared to the null deviance (402.47) indicate a good fit of Model 2. In the first comparison, "Fail to reject reduced model" indicates Model 2 is not significantly worse than Model 1; thus, the reduced model is sufficient. In the second one "Reject model 3, model 2 is better" suggests replacing goout with Walc worsens the fit, and Model 2 is preferred.
+
+## Mixed effects models and small area estimation
+
+
+#### Dataset
+Consider the survey and satellite data measuring the area for corn and soy fields in North-Central Iowa from 1978. Information is only available for few segments for the counties of interest. Detailed information was made available by passes of NASA’s LANDSAT satellites. The number of pixels for both crops is given up to segment level. The data set is available as landsat in the R-package JoSAE. We are interested in obtaining reliable estimates for the total size of corn and soy production for each of the 12 counties in the data set, respectively. Variables of interest:
+-   SegmentsInCounty: number of of segments of county.
+-   SegementID: identificator for segment.
+-   HACorn: hectares of corn for given segment.
+-   HASoybeans: hectares of soybeans for given segment.
+-   PixelsCorn: pixels for corn for given segment.
+-   PixelsSoybeans: pixels for soybeans for given segment.
+-   MeanPixelsCorn: mean of pixels for corn over all segments in given county.
+-   MeanPixelsSoybeans: mean of pixels for soybeans over all segments in given county.
+-   CountyName: county identificator of the segment.
+
+```{r}
+
+data(landsat)
+landsat <- landsat[, c("SegmentsInCounty"
+            ,"SegementID"
+            ,"HACorn"
+            ,"HASoybeans"
+            ,"PixelsCorn"
+            ,"PixelsSoybeans"
+            ,"MeanPixelsCorn"
+            ,"MeanPixelsSoybeans"
+            ,"CountyName")]
+
+
+head(landsat)
+```
+
+1-) Fit a suitable linear model to both the hectares of corn and soybeans for segment for each county. Explain your choice of included parameters. What are the limitations of the linear model? You might want to create a groupedData-object and use the nlme-function lmList.
+
+
+```{r}
+corn_data <- groupedData(HACorn ~ PixelsCorn | CountyName, data = landsat)
+soy_data <- groupedData(HASoybeans ~ PixelsSoybeans | CountyName, data = landsat)
+
+# Fit linear models for each county
+lm_corn <- lmList(HACorn ~ PixelsCorn | CountyName, data = corn_data)
+lm_soy <- lmList(HASoybeans ~ PixelsSoybeans | CountyName, data = soy_data)
+
+summary(lm_corn)
+summary(lm_soy)
+```
+
+Since MeanPixelsCorn and MeanPixelsSoybeans are the same for each country, it does not make sense to include them. Additionally if we included SegementID as groupedData, we would simply overfit to each instance.
+
+In corn model some counties (Worth, Hamilton, Cerro Gordo, Humboldt) have NaN for the intercept and pixel coefficients, indicating insufficient data or a singularity issue in the linear model fitting for these counties.
+The pixel coefficient estimates for other counties vary, with Kossuth having a coefficient of 0.1905 and Webster having 0.4259, indicating a positive relationship between pixel counts and hectares of corn. However, high Pr(>|t|) values (all > 0.05) suggest that pixel counts may not be statistically significant predictors of corn hectares in most counties. A very similar situation in the soybeans model.
+
+2-) Fit a linear mixed model $y_{ij} =  x^t \beta + v_i + e_{ij}$ for both crops such that segments share the same countywide random effect. Make and justify the model assumptions and discuss the fits. Do they exhibit notable differences between the crops?
+```{r}
+mixed.lmer.corn <- lmer(HACorn ~ PixelsCorn + (1|CountyName), data = corn_data)
+summary(mixed.lmer.corn)
+
+mixed.lmer.soybeans <- lmer(HASoybeans ~ PixelsSoybeans + (1|CountyName), data = soy_data)
+summary(mixed.lmer.soybeans)
+
+
+```
+
+Both models include PixelsCorn and PixelsSoybeans as predictors, respectively, which are highly significant given their t-values (8.900 for corn and 11.98 for soybeans). This indicates that the number of pixels is a strong predictor of the hectares of crops.
+
+Here we cannot talk about a nested model since every row corresponds to a segment. Also from the equation, we can say it is a fixed slope model. Looking a variations in the random effect while explained variance for CountryName in corn segments is 62.83/(62.83 + 290.36), it is 239.2/(239.2 + 180.0). We can clearly say that country is more important in soybeans than corn. 
+
+3-) 
+In order to obtain predictions for \(\mu_i = \bar{x}_{ip}^\top \beta + v_i\), four predictors are compared and evaluated with respect to their reliability. Here, for the \(i\)-th county and a specified crop, \(\bar{x}_{ip}\) is the population mean of the explanatory variables and \(\bar{x}_i\) the mean over the observed segments only. Further, \(\hat{\beta}\) is the weighted least-squares estimator for \(\beta\) and \(\gamma_i = \frac{\sigma^2_v}{\sigma^2_v + n^{-1}_i \sigma^2_e}\),
+where \(n_i\) is the number of observations in the \(i\)-th county and \(\sigma^2_v\) and \(\sigma^2_e\) are the variances of random effect and error, respectively. Also, \(\bar{y}_i = n^{-1}_i \sum_{j=1}^{n_i} y_{ij}\).
+
+\begin{itemize}
+    \item Regression predictor: \(\mu^0_i = \bar{x}_{ip}^\top \hat{\beta}\).
+    \item Adjusted survey predictor: \(\mu^1_i = \bar{x}_{ip}^\top \hat{\beta} + \left( \bar{y}_i - \bar{x}_i^\top \hat{\beta} \right)\).
+    \item (Empirical) BLUP: \(\mu^{\gamma_i}_i = \bar{x}_{ip}^\top \hat{\beta} + \hat{\gamma}_i \left( \bar{y}_i - \bar{x}_i^\top \hat{\beta} \right)\).
+    \item Survey predictor: \(\bar{y}_i\).
+\end{itemize}
+
+An estimate for the mean squared error \(\text{MSE}_(\mu_i)( \mu^d_i) = \mathbb{E}(\mu_i - \mu^d_i)^2\) for \(\mu^d_i\) is given by
+\[
+\text{MSE}_(\mu_i)( \mu^d_i) = (1 - d)^2 \hat{\sigma}^2_v + \frac{d^2 \hat{\sigma}^2_e}{n_i} + 2(d - \hat{\gamma}_i)(\bar{x}_{ip} - d \bar{x}_i)^\top \hat{V}(\hat{\beta}) \bar{x}_i + (\bar{x}_{ip} - d \bar{x}_i)^\top \hat{V}(\hat{\beta}) (\bar{x}_{ip} - d \bar{x}_i).
+\]
+
+,
+where $\hat{V}(\hat{\beta})$ is the covariance matrix of $\hat{\beta}$. Create a list with the predictions using each of the above predictors and print the respective MSE for each county and both crops. Discuss the results.
+
+```{r}
+extract_params <- function(model) {
+  list(
+    sigma_v = as.numeric(VarCorr(model)$CountyName),
+    sigma_e = attr(VarCorr(model), "sc")^2,
+    beta = fixef(model),
+    V_beta = vcov(model)
+  )
+}
+
+params_corn <- extract_params(mixed.lmer.corn)
+params_soy <- extract_params(mixed.lmer.soybeans)
+
+# Function to calculate predictors and MSEs for each county
+calculate_predictors_mse <- function(data, params, predictor_col, mean_col, response_col) {
+  counties <- unique(data$CountyName)
+  results <- data.frame(
+    CountyName = counties,
+    mu_0 = numeric(length(counties)),
+    mu_1 = numeric(length(counties)),
+    mu_gamma = numeric(length(counties)),
+    mu_bar_y = numeric(length(counties)),
+    MSE_mu_0 = numeric(length(counties)),
+    MSE_mu_1 = numeric(length(counties)),
+    MSE_mu_gamma = numeric(length(counties))
+  )
+  
+  for (county in counties) {
+    county_data <- subset(data, CountyName == county)
+    n_i <- nrow(county_data)
+    bar_x_i <- mean(county_data[[predictor_col]])
+    bar_x_ip <- unique(county_data[[mean_col]])
+    bar_y_i <- mean(county_data[[response_col]])
+    
+    gamma_i <- params$sigma_v / (params$sigma_v + (params$sigma_e / n_i))
+    mu_0 <- bar_x_ip * params$beta[2] + params$beta[1]
+    mu_1 <- mu_0 + (bar_y_i - (bar_x_i * params$beta[2] + params$beta[1]))
+    mu_gamma <- mu_0 + gamma_i * (bar_y_i - (bar_x_i * params$beta[2] + params$beta[1]))
+    mu_bar_y <- bar_y_i
+    
+    results[results$CountyName == county, c("mu_0", "mu_1", "mu_gamma", "mu_bar_y")] <- c(mu_0, mu_1, mu_gamma, mu_bar_y)
+    
+    # Calculate MSEs
+    MSE_mu_0 <- (1 - 0)^2 * params$sigma_v + (0^2 * params$sigma_e / n_i) + 2*(1 - 0)*(bar_x_ip - 0*bar_x_i) *
+      params$V_beta[2, 2] * bar_x_i + (bar_x_ip - 0*bar_x_i) * params$V_beta[2, 2] * (bar_x_ip - 0*bar_x_i)
+    MSE_mu_1 <- (1 - 1)^2 * params$sigma_v + (1^2 * params$sigma_e / n_i) + 2*(1 - 1)*(bar_x_ip - 1*bar_x_i) *
+      params$V_beta[2, 2] * bar_x_i + (bar_x_ip - 1*bar_x_i) * params$V_beta[2, 2] * (bar_x_ip - 1*bar_x_i)
+    MSE_mu_gamma <- (1 - gamma_i)^2 * params$sigma_v + (gamma_i^2 * params$sigma_e / n_i) + 2*(1 - gamma_i)*(bar_x_ip - gamma_i*bar_x_i) *
+      params$V_beta[2, 2] * bar_x_i + (bar_x_ip - gamma_i*bar_x_i) * params$V_beta[2, 2] * (bar_x_ip - gamma_i*bar_x_i)
+    
+    results[results$CountyName == county, c("MSE_mu_0", "MSE_mu_1", "MSE_mu_gamma")] <- c(MSE_mu_0, MSE_mu_1, MSE_mu_gamma)
+  }
+  return(results)
+}
+
+# Compute results for corn and soybeans
+results_corn <- calculate_predictors_mse(landsat, params_corn, "PixelsCorn", "MeanPixelsCorn", "HACorn")
+results_soy <- calculate_predictors_mse(landsat, params_soy, "PixelsSoybeans", "MeanPixelsSoybeans", "HASoybeans")
+
+# Combine results for output
+list(corn = results_corn, soybeans = results_soy)
+
+
+```
+
+
+4-)
+
+
+## Principal component analysis
+
+#### Dataset
+
+The dataset iris is a classical dataset in statistics, and has been already analysed in Fisher, R. A. (1936) The use of multiple measurements in taxonomic problems. Annals of Eugenics,
+7, Part II, 179-188. It contains the following variables, all measured in centimeters:
+
+-   Sepal.Length: length of the sepal
+-   Sepal.Width: width of the sepal
+-   Petal.Length: length of the petal
+-   Petal.Width: width of the petal
+-   Species: type of the iris: setosa, versicolor, or virginic
+
+There are 50 flowers from each of the three species. All measures are in centimeters. The dataset is accessible automatically in R; try ?iris. We shall use principal component analysis for visualisation
+of the data and K-means classification. In R, this can be done with the functions prcomp and kmeans.
+
+1-) Create a reduced dataset discarding the Species. Calculate loadings and scores for the reduced dataset using the empirical covariance matrix. What proportion of total variation in the data is explained by the first two principal components? Interpret the first two principal
+components.
+
+```{r}
+data(iris)
+
+iris_reduced <- iris[, -5]
+
+perform.pca_.firsttwo <- function(data, scale = FALSE) {
+
+  pca_result <- prcomp(data, scale. = scale)
+  
+  loadings <- pca_result$rotation
+  
+  scores <- pca_result$x
+  
+  explained_variance <- summary(pca_result)$importance[2, ]
+  
+  proportion_variance_explained <- explained_variance[1:2]
+  
+  return(proportion_variance_explained)
+}
+
+print(perform.pca_.firsttwo(iris_reduced))
+```
+The first principal component (PC1) explains approximately 92.46% of the total variance in the dataset. The second principal component (PC2) explains approximately 5.31% of the total variance. Together, the first two principal components explain about 97.77% of the total variance in the dataset.
+
+2-) Do the same, now using the empirical correlation matrix. Are the results similar?
+
+```{r}
+print(perform.pca_.firsttwo(iris_reduced, TRUE))
+```
+
+The first principal component (PC1) explains approximately 72.96% of the total variance. The second principal component (PC2) explains approximately 22.87% of the total variance. Together, the first two principal components explain about 95.83% of the total variance. Using the correlation matrix, the data is standardized, resulting in a more balanced explanation of variance across components compared to the covariance matrix.
+
+3-) Create a new dataset where the petal length is measured in millimetres instead of centimetres. Have the principal components and proportion of variance explained changed when using the covariance matrix? And when using the correlation matrix?
+
+```{r}
+iris_mm <- iris[, -5]
+iris_mm$Petal.Length <- iris_mm$Petal.Length * 10
+
+print(perform.pca_.firsttwo(iris_mm))
+print(perform.pca_.firsttwo(iris_mm, TRUE))
+```
+After transforming Petal Length to millimeters, PC1 explains 99.88% of the total variance, while PC2 explains only 0.08%. The significant change when using the covariance matrix indicates that the variance is dominated by the Petal Length, as its scale has increased tenfold. This causes the first principal component to capture almost all the variance, leaving very little for the second component.The proportions of variance explained by the first two principal components remain almost unchanged when using the correlation matrix. This is because the correlation matrix standardizes the data, making it invariant to changes in the scale of individual variables. The results are consistent regardless of whether Petal Length is measured in centimeters or millimeters.
+
+4-) Henceforth use the original dataset (with all measurements in centimetres) and the covariance matrix. Plot the first two principal components against each other, marking the different species by colour. What do you observe? Would you expect that this two-dimensional plot of the data give a reasonable representation of the relative position of the observations in the original four-dimensional space?
+
+```{r}
+pca_cov <- prcomp(iris_reduced, scale. = FALSE)
+pca_data <- data.frame(PC1 = pca_cov$x[, 1], PC2 = pca_cov$x[, 2], Species = iris$Species)
+
+# Plot the first two principal components
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Species)) +
+  geom_point(size = 3) +
+  labs(title = "PCA of Iris Dataset (Using Covariance Matrix)",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+
+```
+It is very informative, PC1 can clearly differetiate species from each other also given that the first two principal components capture a significant portion of the total variance.
+
+
+5-) Perform K-means clustering for the first two principal components obtained in (a) with K = 3 and using set.seed(47) (the output algorithm depends quite heavily on the seed). Do clusters coincide with the iris species? What is the classification error? Note that you may need to relabel ”by hand” the result in kmeans(...)$cluster when comparing it with the variable Species. The latter needs to be converted into an integer. Is the classification error when using the entire dataset much smaller?
+```{r}
+set.seed(47)
+
+# Perform K-means clustering on the first two principal components
+kmeans_result <- kmeans(pca_data[, c("PC1", "PC2")], centers = 3)
+
+# Add the cluster results to the data frame
+pca_data$Cluster <- kmeans_result$cluster
+species_int <- as.integer(pca_data$Species)
+
+print(table(pca_data$Cluster, species_int))
+
+cluster_to_species <- c(2, 3, 1)
+relabeled_clusters <- cluster_to_species[pca_data$Cluster]
+table(relabeled_clusters, species_int)
+
+1-mean(relabeled_clusters != species_int)
+
+```
+The classification error is 0.5733333. Unfortunately it does not coincide much.
+
+## Time Series
+
+#### Dataset
+Access the cmort dataset from the astsa package. The data contains the weekly cardiovascular mortality in Los Angeles County from 1970 to 1979 from following study: Shumway, R.H. (1988). Applied statistical time series analysis. Prentice-Hall, Englewood Cliffs
+
+
+#### Exercises
+
+1-) Fit an AR(2) to the data using linear regression as in the example on the Recruitment data presented in the lecture.
+
+```{r}
+data("cmort")
+
+df <- data.frame(matrix(NA, ncol=3, nrow=(length(cmort)-2)))
+names(df) <- c("x", "x_1", "x_2")
+
+for (i in 1:(n-2)) {
+  df[i, ] <- cmort[c(i, i+1, i+2)]
+}
+
+ar.model.cmort <- lm(x ~ x_1 + x_2, data=df)
+summary(ar.model.cmort)
+```
+
+2-) Use the estimated coefficients from (a) to forecast the following 4 weeks together with a 95%-CI.
+
+```{r}
+coef <- ar.model.cmort$coefficients
+
+forecasts <- numeric(4)
+forecast_se <- numeric(4)
+last_values <- tail(cmort, 2)
+
+for (i in 1:4) {
+  forecasts[i] <- coef[1] + coef[2] * last_values[2] + coef[3] * last_values[1]
+  
+  last_values <- c(last_values[2], forecasts[i])
+  
+  forecast_se[i] <- sqrt(sum(residuals(ar.model.cmort)^2) / (n-2))
+}
+
+alpha <- 0.05
+z <- qnorm(1 - alpha / 2)
+forecast_lower <- forecasts - z * forecast_se
+forecast_upper <- forecasts + z * forecast_se
+
+forecast_df <- data.frame(
+  Week = (n + 1):(n + 4),
+  Forecast = forecasts,
+  Lower_CI = forecast_lower,
+  Upper_CI = forecast_upper
+)
+
+print(forecast_df)
+
+# Prepare data for plotting
+plot_data <- data.frame(
+  Week = (n-49):(n+4),
+  Mortality = c(tail(cmort, 50), forecasts),
+  Forecast = c(rep(NA, 50), forecasts),
+  Lower_CI = c(rep(NA, 50), forecast_lower),
+  Upper_CI = c(rep(NA, 50), forecast_upper)
+)
+
+# Plot the data
+ggplot(plot_data, aes(x = Week, y = Mortality)) +
+  geom_line(color = "blue") +
+  geom_point(color = "blue") +
+  geom_line(aes(y = Forecast), color = "red") +
+  geom_point(aes(y = Forecast), color = "red") +
+  geom_ribbon(aes(ymin = Lower_CI, ymax = Upper_CI), fill = "grey80", alpha = 0.5) +
+  labs(title = "Forecasted Cardiovascular Mortality with 95% CI",
+       x = "Week",
+       y = "Mortality") +
+  theme_minimal()
+
+```
+
+
+3-) Now use the Yule-Walker method to estimate the model. Compare the estimates and standard errors of the coefficients from the Yule-Walker method to the results from 1.
+
+```{r}
+acf_vals <- acf(cmort, plot = FALSE, type = "covariance")$acf[1:3]
+gamma0 <- acf_vals[1]
+gamma1 <- acf_vals[2]
+gamma2 <- acf_vals[3]
+
+# Yule-Walker equations
+R <- matrix(c(1, gamma1/gamma0, gamma1/gamma0, 1), nrow = 2)
+r <- c(gamma1/gamma0, gamma2/gamma0)
+phi <- solve(R, r)
+phi1_yw <- phi[1]
+phi2_yw <- phi[2]
+
+# Calculate the variance of the white noise process
+sigma2_yw <- gamma0 * (1 - (phi1_yw * gamma1/gamma0 + phi2_yw * gamma2/gamma0))
+
+# Calculate the standard errors of the coefficients
+n <- length(cmort)
+
+# Or we can use the R function ar.yw
+cmort_yw <- ar.yw(cmort, order = 2)
+cat("phi1 =", cmort_yw$ar[1], "\n")
+cat("phi2 =", cmort_yw$ar[2], "\n")
+
+se_phi <- sqrt(diag(cmort_yw$asy.var.coef))
+
+# Print results
+cat("Yule-Walker Estimates:\n")
+cat("phi1 =", phi1_yw, "\n")
+cat("phi2 =", phi2_yw, "\n")
+cat("Standard error:\n")
+cat("se_phi =", se_phi, "\n")
+
+coef_lm <- ar.model.cmort$coefficients
+se_lm <- summary(ar.model.cmort)$coefficients[, "Std. Error"]
+
+cat("\nLinear Regression Estimates (from part a):\n")
+cat("phi1 =", coef_lm[2], "\n")
+cat("phi2 =", coef_lm[3], "\n")
+cat("Standard errors:\n")
+cat("se_phi1 =", se_lm[2], "\n")
+cat("se_phi2 =", se_lm[3], "\n")
+```
+
+
+4-) Predict the following 4 weeks using the estimations from the Yule-Walker method.
+5-) Compare the estimated standard errors of the coefficients obtained by linear regression with their corresponding asymptotic approximations as given by the asymptotic distribution of the estimators on the slides.
+
+```{r}
+forecasts_yw <- numeric(4)
+last_values_yw <- tail(cmort, 2)
+
+# Perform the forecasts
+for (i in 1:4) {
+  forecasts_yw[i] <- phi1_yw * last_values_yw[2] + phi2_yw * last_values_yw[1]
+  last_values_yw <- c(last_values_yw[2], forecasts_yw[i])
+}
+
+forecast_lower_yw <- forecasts_yw - z * se_phi
+forecast_upper_yw <- forecasts_yw + z * se_phi
+
+# Create the forecast dataframe for Yule-Walker
+forecast_df_yw <- data.frame(
+  Week = (n + 1):(n + 4),
+  Forecast = forecasts_yw,
+  Lower_CI = forecast_lower_yw,
+  Upper_CI = forecast_upper_yw
+)
+
+print(forecast_df_yw)
+
+
+# Calculate asymptotic variance-covariance matrix
+asymptotic_var_cov_matrix <- (solve(R) * sigma2_yw / n) / gamma0
+se_phi_yw_asymptotic <- sqrt(asymptotic_var_cov_matrix[1, 1])
+
+cat("se_phi_yw_asymptotic =", se_phi_yw_asymptotic, "\n")
+
+```
+
+
+
 References
 
 https://math.stackexchange.com/questions/240496/finding-the-maximum-likelihood-estimator
-
-https://www.youtube.com/watch?v=8z4I348eayg
+[2] McCullagh & Nelder, Generalized Linear Models, 1989
