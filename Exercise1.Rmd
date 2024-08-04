@@ -1439,6 +1439,7 @@ All covariates are significant at various levels, indicating they all contribute
 
 #### Dataset
 Consider the survey and satellite data measuring the area for corn and soy fields in North-Central Iowa from 1978. Information is only available for few segments for the counties of interest. Detailed information was made available by passes of NASA’s LANDSAT satellites. The number of pixels for both crops is given up to segment level. The data set is available as landsat in the R-package JoSAE. We are interested in obtaining reliable estimates for the total size of corn and soy production for each of the 12 counties in the data set, respectively. Variables of interest:
+
 -   SegmentsInCounty: number of of segments of county.
 -   SegementID: identificator for segment.
 -   HACorn: hectares of corn for given segment.
@@ -1530,6 +1531,7 @@ extract_params <- function(model) {
   )
 }
 
+# Extract parameters for corn and soybeans
 params_corn <- extract_params(mixed.lmer.corn)
 params_soy <- extract_params(mixed.lmer.soybeans)
 
@@ -1563,12 +1565,20 @@ calculate_predictors_mse <- function(data, params, predictor_col, mean_col, resp
     results[results$CountyName == county, c("mu_0", "mu_1", "mu_gamma", "mu_bar_y")] <- c(mu_0, mu_1, mu_gamma, mu_bar_y)
     
     # Calculate MSEs
-    MSE_mu_0 <- (1 - 0)^2 * params$sigma_v + (0^2 * params$sigma_e / n_i) + 2*(1 - 0)*(bar_x_ip - 0*bar_x_i) *
-      params$V_beta[2, 2] * bar_x_i + (bar_x_ip - 0*bar_x_i) * params$V_beta[2, 2] * (bar_x_ip - 0*bar_x_i)
-    MSE_mu_1 <- (1 - 1)^2 * params$sigma_v + (1^2 * params$sigma_e / n_i) + 2*(1 - 1)*(bar_x_ip - 1*bar_x_i) *
-      params$V_beta[2, 2] * bar_x_i + (bar_x_ip - 1*bar_x_i) * params$V_beta[2, 2] * (bar_x_ip - 1*bar_x_i)
-    MSE_mu_gamma <- (1 - gamma_i)^2 * params$sigma_v + (gamma_i^2 * params$sigma_e / n_i) + 2*(1 - gamma_i)*(bar_x_ip - gamma_i*bar_x_i) *
-      params$V_beta[2, 2] * bar_x_i + (bar_x_ip - gamma_i*bar_x_i) * params$V_beta[2, 2] * (bar_x_ip - gamma_i*bar_x_i)
+    x_i_vec <- c(1, bar_x_i)
+    x_ip_vec <- c(1, bar_x_ip)
+    
+    MSE_mu_0 <- (1 - 0)^2 * params$sigma_v + (0^2 * params$sigma_e / n_i) + 
+      2 * (0 - gamma_i) * t(x_ip_vec - 0 * x_i_vec) %*% params$V_beta %*% (x_ip_vec - 0 * x_i_vec) + 
+      t(x_ip_vec - 0 * x_i_vec) %*% params$V_beta %*% (x_ip_vec - 0 * x_i_vec)
+    
+    MSE_mu_1 <- (1 - 1)^2 * params$sigma_v + (1^2 * params$sigma_e / n_i) + 
+      2 * (1 - gamma_i) * t(x_ip_vec - 1 * x_i_vec) %*% params$V_beta %*% (x_ip_vec - 1 * x_i_vec) + 
+      t(x_ip_vec - 1 * x_i_vec) %*% params$V_beta %*% (x_ip_vec - 1 * x_i_vec)
+    
+    MSE_mu_gamma <- (1 - gamma_i)^2 * params$sigma_v + (gamma_i^2 * params$sigma_e / n_i) + 
+      2 * (gamma_i - gamma_i) * t(x_ip_vec - gamma_i * x_i_vec) %*% params$V_beta %*% (x_ip_vec - gamma_i * x_i_vec) + 
+      t(x_ip_vec - gamma_i * x_i_vec) %*% params$V_beta %*% (x_ip_vec - gamma_i * x_i_vec)
     
     results[results$CountyName == county, c("MSE_mu_0", "MSE_mu_1", "MSE_mu_gamma")] <- c(MSE_mu_0, MSE_mu_1, MSE_mu_gamma)
   }
@@ -1766,7 +1776,7 @@ summary(ar.model.cmort)
 
 2-) Use the estimated coefficients from (a) to forecast the following 4 weeks together with a 95%-CI.
 
-```{r}
+```{r, warning=FALSE}
 coef <- ar.model.cmort$coefficients
 
 forecasts <- numeric(4)
@@ -1901,9 +1911,24 @@ cat("se_phi_yw_asymptotic =", se_phi_yw_asymptotic, "\n")
 
 ```
 
+The estimated standard errors from linear regression (0.03998 and 0.04007) are very close to the Yule-Walker standard errors (0.04001 and 0.04001).
 
+6-) Try to fit an ARMA(2,2) model to the data. Does the more complex model provides a better fit or is an AR(2) model enough?
 
-References
+```{r}
 
-https://math.stackexchange.com/questions/240496/finding-the-maximum-likelihood-estimator
-[2] McCullagh & Nelder, Generalized Linear Models, 1989
+ar.ols(cmort, order=2, demean=FALSE, intercept=TRUE)
+arima(cmort, order = c(2, 0, 2))
+
+```
+
+The ARMA model results in different estimates and larger standard errors due to the inclusion of moving average terms, highlighting how additional parameters can influence the estimates and their precision. However, the moving average coefficients are close to zero, indicating that they do not significantly contribute to the estimation.
+
+## References
+
+1. McCullagh, P., \& Nelder, J. A. (1989). *Generalized Linear Models*. Chapman and Hall/CRC.
+2. Shumway, R. H. (2000). *Time Series Analysis and Its Applications*. Springer.
+3. Finding the maximum likelihood estimator. Retrieved from [Math Stack Exchange](https://math.stackexchange.com/questions/240496/finding-the-maximum-likelihood-estimator).
+4. Condition number. Retrieved from [Illinois Engineering](https://courses.engr.illinois.edu/cs357/sp2024/notes/ref-10-condition.html).
+5. Cause of a high condition number in a Python statsmodels regression. Retrieved from [Stack Exchange](https://stats.stackexchange.com/questions/243000/cause-of-a-high-condition-number-in-a-python-statsmodels-regression#comment462188_243000).
+
